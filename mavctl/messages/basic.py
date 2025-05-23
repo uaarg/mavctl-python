@@ -49,5 +49,8 @@ class Basic:
         self.mav.motors_disarmed_wait()
         print("MAVCTL: Disarmed!")
  
-
+    def send_status_message(self, message: str):
+        self.mav.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE,
+                                     message.encode())
+        print("MAVCTL Message: " + message)
 
