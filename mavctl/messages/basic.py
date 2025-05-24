@@ -96,6 +96,15 @@ class Basic:
         )
         print("MAVCTL: RTL COMPLETE")
 
+
+    def generate_typemask(self, keeps):
+        # Generates typemask based on which values to be included
+        mask = 0
+        for bit in keeps:
+            mask |= (0 << bit)
+        return mask
+
+
     def set_position_local_ned(self,
                                coordinate_frame = mavutil.mavlink.MAV_FRAME_LOCAL_NED,
                                type_mask=0x07FF,
@@ -110,23 +119,26 @@ class Basic:
                                afz = 0,
                                yaw = 0,
                                yaw_rate = 0):
-        self.mav.mav.command_long_send(
-            self.mav.target_system,
-            self.mav.target_component,
-            mavutil.mavlink.MAV_CMD_SET_POSITION_TARGET_LOCAL_NED,
-            coordinate_frame,
-            type_mask,
-            x,
-            y,
-            z,
-            vx,
-            vy,
-            vz,
-            afx,
-            afy,
-            afz,
-            yaw,
-            yaw_rate
-        )
-                                               
+    
+        
+        self.mav.mav.set_position_target_local_ned_send(
+                0,
+                self.mav.target_system,
+                self.mav.target_component,
+                coordinate_frame,
+                type_mask,
+                x,
+                y,
+                z,
+                vx,
+                vy,
+                vz,
+                afx,
+                afy,
+                afz,
+                yaw,
+                yaw_rate)
+
+
+
 

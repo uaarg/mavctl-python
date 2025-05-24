@@ -5,7 +5,7 @@ import time
 
 
 # Function to connect to mavlink 
-def connect(ip = "udp:127.0.0.1:14551", # Default IP and port for the UAARG Autopilot Simulator
+def connect(ip = "udp:127.0.0.1:14552", # Default IP and port for the UAARG Autopilot Simulator
             #baud = 115200,             # Default Baud Rate for the PixHawk, Add support for this later
             #source_system = 255,       # Add support for this later 
             #source_component = 0,      # Add support for this later    
