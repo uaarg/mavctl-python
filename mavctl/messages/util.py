@@ -1,5 +1,6 @@
 import time
 import math
+from math import radians, cos
 from pymavlink import mavutil
 
 
@@ -36,4 +37,27 @@ def check_target_reached(target1, target2, tolerance) -> bool:
     else:
         return False
 
+def LatLon_to_XY(point, origin):
 
+    R = 6378137 # Radius of the Earth in meters
+
+    origin_lat = origin[0]
+    origin_lon = origin[1]
+    point_lat = point[0]
+    point_lon = point[1]
+
+    origin_lon_rad = radians(origin_lon)
+    origin_lat_rad = radians(origin_lat)
+    point_lon_rad = radians(point_lon)
+    point_lat_rad = radians(point_lat)
+
+    delta_lon = point_lon_rad - origin_lon_rad
+    delta_lat = point_lat_rad - origin_lat_rad
+
+    x = delta_lat * R
+    y = delta_lon * cos((origin_lat_rad + point_lat_rad) / 2) * R
+    print(origin)
+    print(point)
+    
+    print(x, y) 
+    return (x, y, point[2])
