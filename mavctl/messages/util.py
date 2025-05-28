@@ -1,8 +1,7 @@
-import time
 import math
 from math import radians, cos
 from pymavlink import mavutil
-
+from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
 
 
 def distance_to_target(target1: tuple, target2: tuple) -> tuple:
@@ -13,11 +12,11 @@ def distance_to_target(target1: tuple, target2: tuple) -> tuple:
     
     """
 
-    dx = target2[0] - target1[0]
-    dy = target2[1] - target1[1]
-    dz = target2[2] - target1[2]
+    dx = target2.north - target1.north
+    dy = target2.east - target1.east
+    dz = target2.down - target1.down
 
-    return (dx, dy , dz)
+    return LocationLocal(dx, dy, dz)
 
 def check_target_reached(target1, target2, tolerance) -> bool:
     """
@@ -28,9 +27,9 @@ def check_target_reached(target1, target2, tolerance) -> bool:
     """
     delta = distance_to_target(target1, target2)
 
-    target_length = math.sqrt(target1[0] ** 2 + target1[1] ** 2 + target1[2] ** 2)  
+    target_length = math.sqrt(target1.north ** 2 + target1.east ** 2 + target1.down ** 2)  
  
-    delta_length = math.sqrt(delta[0] ** 2 + delta[1] ** 2 + delta[2] ** 2)  
+    delta_length = math.sqrt(delta.north ** 2 + delta.east ** 2 + delta.down ** 2)  
 
     if delta_length < target_length * tolerance:
         return True
@@ -41,10 +40,10 @@ def LatLon_to_XY(point, origin):
 
     R = 6378137 # Radius of the Earth in meters
 
-    origin_lat = origin[0]
-    origin_lon = origin[1]
-    point_lat = point[0]
-    point_lon = point[1]
+    origin_lat = origin.lat
+    origin_lon = origin.lon
+    point_lat = point.lat
+    point_lon = point.lon
 
     origin_lon_rad = radians(origin_lon)
     origin_lat_rad = radians(origin_lat)
@@ -54,10 +53,12 @@ def LatLon_to_XY(point, origin):
     delta_lon = point_lon_rad - origin_lon_rad
     delta_lat = point_lat_rad - origin_lat_rad
 
-    x = delta_lat * R
-    y = delta_lon * cos((origin_lat_rad + point_lat_rad) / 2) * R
+    alt = point.alt - origin.alt
+
+    north = delta_lat * R
+    east = delta_lon * cos((origin_lat_rad + point_lat_rad) / 2) * R
     print(origin)
     print(point)
     
-    print(x, y) 
-    return (x, y, point[2])
+    print(north, east, alt)
+    return LocationLocal(north, east, alt)

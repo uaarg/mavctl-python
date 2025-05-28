@@ -1,6 +1,7 @@
 from pymavlink import mavutil
 import time
 from messages import util
+from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
 
 class Navigator:
 
@@ -125,8 +126,8 @@ class Navigator:
             lat = msg.lat / 1e7
             lon = msg.lon / 1e7
             alt = msg.alt / 1000
-
-        return (lat, lon, alt)
+        
+        return LocationGlobal(lat, lon, alt)
 
     def get_local_position(self):
         """
@@ -137,11 +138,11 @@ class Navigator:
         
         msg = self.mav.recv_match(type='LOCAL_POSITION_NED', blocking=True)
         if msg:
-            x = msg.x
-            y = msg.y
-            z = msg.z
+            north = msg.x
+            east = msg.y
+            down = msg.z
 
-        return(x, y, z)
+        return LocationLocal(north, east, down)
 
     def get_global_origin(self):
         """
@@ -150,12 +151,11 @@ class Navigator:
         msg = self.mav.recv_match(type='HOME_POSITION', blocking=True)
 
         if msg:
-            lat = msg.latitude / 10000000
-            lon = msg.longitude / 10000000
+            lat = msg.latitude / 1e7
+            lon = msg.longitude / 1e7
             alt = msg.altitude / 1000
 
-        return (lat, lon, alt)
-
+        return LocationGlobal(lat, lon, alt)
 
     def takeoff(self, altitude):
         """
@@ -178,7 +178,9 @@ class Navigator:
                                         0,
                                         0,
                                         altitude)
-        self.wait_target_reached((0, 0, -altitude))
+
+        current_location = self.get_local_position()
+        self.wait_target_reached(current_location)
 
 
     def wait_target_reached(self, target, tolerance=0.05, timeout = 30) -> bool:
@@ -187,6 +189,7 @@ class Navigator:
         """
 
         current_pos = self.get_local_position() 
+        
 
         check_target = util.check_target_reached(current_pos, target, tolerance)
         start_time = time.time()

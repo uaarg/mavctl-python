@@ -16,7 +16,7 @@ if master.set_mode_wait():
     master.takeoff(10)
     time.sleep(5)
 
-    test.simple_goto_global(master, 53.496596, -113.550405, 677) 
+    test.simple_goto_local(master, 53.496596, -113.550405, 20) 
 
 
     master.return_to_launch()
