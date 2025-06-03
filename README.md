@@ -2,6 +2,21 @@
 
 An Open Source Library for Autonomous Drone Navigation.
 
+## Things to be Familiar With
+
+Before diving into mavctl, it is recommended that you read up on or familiarize yourself with the following so that you have an easier time working on mavctl
+
+1. MAVLink (https://mavlink.io/)
+Take a look through introduction just to get an idea of how the MAVLink protocol works
+
+2. Shepard (https://github.com/uaarg/shepard)
+Take a look through here (https://github.com/uaarg/shepard/blob/main/src/modules/autopilot/navigator.py) to get an idea of what the navigation functions should sort of look like
+Another thing to take a look at is the flight tests scripts as well (https://github.com/uaarg/shepard/blob/main/src/modules/autopilot/navigator.py)
+
+3. DroneKit (OPTIONAL) (https://github.com/dronekit/dronekit-python)
+While this is optional, a lot of things from DroneKit are borrowed, specifically the things that DroneKit does well. 
+Overall, mavctl-python is similar to dronekit but it is revamped and is meant to replace DroneKit for all of its functionality.
+Over time we will reach a point where we will have exceeded dronekit but that time has not been reached just yet.
 
 ## Contribution Guidelines
 
