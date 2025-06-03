@@ -41,3 +41,11 @@ class Battery(object):
         else:
             self.level = level
 
+class Velocity(object):
+    def __init__(self, north, east, down):
+        self.north = north
+        self.east = east
+        self.down = down
+
+    def magnitude(self):
+        return sqrt(self.north ** 2 + self.east ** 2 + self.down ** 2)

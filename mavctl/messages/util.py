@@ -1,10 +1,10 @@
 import math
-from math import radians, cos
+from math import radians, degrees, cos, sin, atan2, sqrt
 from pymavlink import mavutil
 from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
 
 
-def distance_to_target(target1: tuple, target2: tuple) -> tuple:
+def distance_to_target(target1, target2):
     """
     Returns the distance vector to the target
     Target 1: Current Position of Vehicle 
@@ -30,13 +30,13 @@ def check_target_reached(target1, target2, tolerance) -> bool:
     target_length = math.sqrt(target1.north ** 2 + target1.east ** 2 + target1.down ** 2)  
  
     delta_length = math.sqrt(delta.north ** 2 + delta.east ** 2 + delta.down ** 2)  
-
-    if delta_length < target_length * tolerance:
+    print(target_length, delta_length)
+    if delta_length < 0.5:
         return True
     else:
         return False
 
-def LatLon_to_XY(point, origin):
+def LatLon_to_Distance(point, origin):
 
     R = 6378137 # Radius of the Earth in meters
 
@@ -54,11 +54,25 @@ def LatLon_to_XY(point, origin):
     delta_lat = point_lat_rad - origin_lat_rad
 
     alt = point.alt - origin.alt
-
-    north = delta_lat * R
-    east = delta_lon * cos((origin_lat_rad + point_lat_rad) / 2) * R
-    print(origin)
-    print(point)
     
-    print(north, east, alt)
-    return LocationLocal(north, east, alt)
+    a = sin(delta_lat / 2) ** 2 + cos(origin_lat) * cos(point_lat) * sin(delta_lon / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    l = R * c
+    
+    return l
+   
+def Heading(point1, point2):
+
+    lat1_rad = radians(point1.lat)
+    lat2_rad = radians(point2.lat)
+    delta_lon = radians(point2.lon - point1.lon)
+
+    x = sin(delta_lon) * cos(lat2_rad)
+    y = cos(lat1_rad) * sin(lat2_rad) - sin(lat1_rad) * cos(lat2_rad) * cos(delta_lon)
+
+    angle = atan2(x, y)
+    heading = (degrees(angle) + 360) % 360
+
+    return heading
+
+

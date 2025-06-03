@@ -2,7 +2,7 @@ import time
 from messages import util
 from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
 from math import radians, atan
-
+from messages.util import Heading, LatLon_to_Distance
 # This tests the wait target reached and has been verified to work
 
 def simple_goto_local(master, x, y, z): 
@@ -13,14 +13,15 @@ def simple_goto_local(master, x, y, z):
     print("Moving")
     angle = atan(y/x) 
     master.set_position_local_ned(type_mask = type_mask, x = x, y = y, z = -z, yaw = angle)
-    master.wait_target_reached(LocationLocal(x, y, z))
+    master.wait_target_reached(LocationLocal(x, y, -z))
 
 def simple_goto_global(master, lat, lon, alt):
     type_mask = master.generate_typemask([0, 1, 2, 9])
     print("Moving")
-    master.set_position_global(type_mask = type_mask, lon = lon, lat = lat, alt = alt, yaw = radians(lon + lat))
+    start_point = master.get_global_position()
+    heading = Heading(start_point, LocationGlobal(lat, lon, alt))
+    master.set_position_global(type_mask = type_mask, lon = lon, lat = lat, alt = alt, yaw = radians(heading))
     origin = master.get_global_origin()
-    print(origin)
-    pos_local = util.LatLon_to_XY(LocationGlobal(lat, lon, alt), origin) 
-    master.wait_target_reached(pos_local, tolerance=0.1)
+
+    master.wait_target_reached_global(LocationGlobal(lat, lon, alt))
 

@@ -1,7 +1,8 @@
 from pymavlink import mavutil
 import time
 from messages import util
-from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
+from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity
+from math import sqrt
 
 class Navigator:
 
@@ -157,6 +158,20 @@ class Navigator:
 
         return LocationGlobal(lat, lon, alt)
 
+    def get_velocity(self):
+        """
+        Gets velocity of drone in NED coordinates
+        """
+        msg = self.mav.recv_match(type='LOCAL_POSITION_NED', blocking=True)
+        if msg:
+            north = msg.vx
+            east = msg.vy
+            down = msg.vz
+
+        return Velocity(north, east, down)
+
+
+
     def takeoff(self, altitude):
         """
         Initiates a takeoff the drone to target altiude
@@ -180,28 +195,7 @@ class Navigator:
                                         altitude)
 
         current_location = self.get_local_position()
-        self.wait_target_reached(current_location)
-
-
-    def wait_target_reached(self, target, tolerance=0.05, timeout = 30) -> bool:
-        """
-        Waits for the drone to reach specified target
-        """
-
-        current_pos = self.get_local_position() 
-        
-
-        check_target = util.check_target_reached(current_pos, target, tolerance)
-        start_time = time.time()
-        while not check_target:
-            current_pos = self.get_local_position()
-            check_target = util.check_target_reached(current_pos, target, tolerance)
-            if time.time() - start_time > timeout:
-                print("MAVCTL Timeout: Failed to reach target within tolerance. Continuing execution")
-                return False
-            
-        return True
-
+        self.wait_target_reached(LocationLocal(0, 0, -altitude))
 
     def return_to_launch(self):
         print("MAVCTL: RTL")
@@ -269,7 +263,7 @@ class Navigator:
 
 
     def set_position_global(self,
-                            coordinate_frame=mavutil.mavlink.MAV_FRAME_GLOBAL,
+                            coordinate_frame=mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
                             type_mask=0x07FF,
                             lat=0,
                             lon=0,
@@ -305,5 +299,63 @@ class Navigator:
 
                             
 
+
+
+
+    def wait_target_reached(self, target, tolerance=0.05, timeout = 30) -> bool:
+        """
+        Waits for the drone to reach specified target
+        """
+
+        current_pos = self.get_local_position() 
+        
+        print(current_pos.north, current_pos.east, current_pos.down)
+        check_target = util.check_target_reached(current_pos, target, tolerance)
+        start_time = time.time()
+        while not check_target:
+            current_pos = self.get_local_position()
+            check_target = util.check_target_reached(current_pos, target, tolerance)
+            if time.time() - start_time > timeout:
+                print("MAVCTL Timeout: Failed to reach target within tolerance. Continuing execution")
+                return False
+            
+        return True
+
+    def wait_target_reached_global(self, target, timeout = 30):
+
+        current_pos = self.get_global_position()
+        distance = util.LatLon_to_Distance(current_pos, target)
+        start_time = time.time()
+
+        while not distance < 0.5:
+            current_pos = self.get_global_position()
+            distance = util.LatLon_to_Distance(current_pos, target)
+            if time.time() - start_time > timeout:
+                print("MAVCTL Timeout: Failed to reach target within tolerance. Continuing execution")
+                return False
+        
+        return True
+
+        
+
+'''
+    def wait_target_reached(self, timeout = 30) -> bool:
+        time.sleep(10) 
+        current_vel = self.get_velocity()
+        start_time = time.time()
+        vel_buffer = []
+        vel_buffer.append(current_vel)
+        print(current_vel.magnitude())
+        while current_vel.magnitude() and vel_buffer[-1].magnitude() >= 0.25:
+            time.sleep(0.5)
+            current_vel = self.get_velocity()
+            print(current_vel.magnitude())
+            print(vel_buffer[-1].magnitude())
+            vel_buffer.append(current_vel)
+            if time.time() - start_time > timeout:
+                print("MAVCTL Timeout: Failed to reach target within tolerance. Continuing execution")
+                return False
+        return True 
+'''
 
 
