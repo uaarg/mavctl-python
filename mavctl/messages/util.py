@@ -30,7 +30,6 @@ def check_target_reached(target1, target2, tolerance) -> bool:
     target_length = math.sqrt(target1.north ** 2 + target1.east ** 2 + target1.down ** 2)  
  
     delta_length = math.sqrt(delta.north ** 2 + delta.east ** 2 + delta.down ** 2)  
-    print(target_length, delta_length)
     if delta_length < 0.5:
         return True
     else:

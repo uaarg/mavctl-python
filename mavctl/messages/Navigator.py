@@ -39,7 +39,12 @@ class Navigator:
         print("MAVCTL: Waiting for vehicle to arm")
         self.mav.motors_armed_wait()
         print("MAVCTL: Armed!")
-    
+   
+    def wait_vehicle_armed(self):
+        print("MAVCTL: Waiting for vehicle to arm")
+        self.mav.motors_armed_wait()
+        print("Armed!")
+
     def disarm(self):
         """
         Disarms the drone.
@@ -80,7 +85,7 @@ class Navigator:
             raise ValueError("MAVCTL Error: Mode " + mode + "not recognized")
 
         mode_id = mode_mapping[mode]
-
+        print("MAVCTL: Waiting for " + mode + " mode")
         while True:
             if timeout:
                 if time.time() - start_time >= timeout: 
@@ -99,11 +104,11 @@ class Navigator:
             if msg:
                 current_mode_id = msg.custom_mode
                 if current_mode_id == mode_id:
+                    print("MAVCTL: Set to " + mode + " mode")
                     return True
 
             time.sleep(0.5)
-            print("MAVCTL: Waiting for " + mode + " mode")
-        
+                    
 
     def send_status_message(self, message: str):
         """
@@ -194,7 +199,6 @@ class Navigator:
                                         0,
                                         altitude)
 
-        current_location = self.get_local_position()
         self.wait_target_reached(LocationLocal(0, 0, -altitude))
 
     def return_to_launch(self):
@@ -212,7 +216,6 @@ class Navigator:
             0,
             0
         )
-        print("MAVCTL: RTL COMPLETE")
 
 
 
@@ -319,7 +322,6 @@ class Navigator:
 
         current_pos = self.get_local_position() 
         
-        print(current_pos.north, current_pos.east, current_pos.down)
         check_target = util.check_target_reached(current_pos, target, tolerance)
         start_time = time.time()
         while not check_target:
@@ -347,25 +349,4 @@ class Navigator:
         return True
 
         
-
-'''
-    def wait_target_reached(self, timeout = 30) -> bool:
-        time.sleep(10) 
-        current_vel = self.get_velocity()
-        start_time = time.time()
-        vel_buffer = []
-        vel_buffer.append(current_vel)
-        print(current_vel.magnitude())
-        while current_vel.magnitude() and vel_buffer[-1].magnitude() >= 0.25:
-            time.sleep(0.5)
-            current_vel = self.get_velocity()
-            print(current_vel.magnitude())
-            print(vel_buffer[-1].magnitude())
-            vel_buffer.append(current_vel)
-            if time.time() - start_time > timeout:
-                print("MAVCTL Timeout: Failed to reach target within tolerance. Continuing execution")
-                return False
-        return True 
-'''
-
 
