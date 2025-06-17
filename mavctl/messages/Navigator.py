@@ -260,7 +260,17 @@ class Navigator:
                                                         afz,
                                                         yaw,
                                                         yaw_rate)
+   
 
+    def set_speed(self, speed):
+   
+        self.mav.mav.param_set_send(
+                self.mav.target_system,
+                self.mav.target_component,
+                b'WPNAV_SPEED', 
+                speed*100, # Speed in m/s is converted to cm/s
+                mavutil.mavlink.MAV_PARAM_TYPE_REAL32)
+    
 
     def set_position_global(self,
                             coordinate_frame=mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,

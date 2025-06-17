@@ -3,6 +3,9 @@ from messages import util
 from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
 from math import radians, atan
 from messages.util import Heading, LatLon_to_Distance
+
+# This file is meant for implementing more advanced features in mavctl
+
 # This tests the wait target reached and has been verified to work
 
 def simple_goto_local(master, x, y, z): 
