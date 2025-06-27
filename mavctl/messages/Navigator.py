@@ -187,8 +187,9 @@ class Navigator:
         """
 
         print("MAVCTL: Taking Off to: " + str(altitude) + "m")
-        self.mav.mav.command_long_send(0,
-                                       0,
+        self.mav.mav.command_long_send(
+                                        self.mav.mav.target_system,
+                                        self.mav.mav.target_component,
                                         mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
                                         0,
                                         0,
