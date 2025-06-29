@@ -81,6 +81,7 @@ class Navigator:
         start_time = time.time()
         
         mode_mapping = self.mav.mode_mapping()
+        print(mode_mapping)
         if mode not in mode_mapping:
             raise ValueError("MAVCTL Error: Mode " + mode + "not recognized")
 
@@ -99,15 +100,15 @@ class Navigator:
                     1,
                     1)
 
-            msg = self.mav.recv_match(type = "HEARTBEAT", blocking = True, timeout = 1)
+            msg = self.mav.recv_match(type = "HEARTBEAT", blocking = True, timeout = 0.25)
 
             if msg:
                 current_mode_id = msg.custom_mode
+                print(current_mode_id, mode_id)
                 if current_mode_id == mode_id:
                     print("MAVCTL: Set to " + mode + " mode")
                     return True
 
-            time.sleep(0.5)
                     
 
     def send_status_message(self, message: str):
@@ -127,12 +128,11 @@ class Navigator:
 
         """
         msg = self.mav.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
-        
         if msg:
             lat = msg.lat / 1e7
             lon = msg.lon / 1e7
             alt = msg.alt / 1000
-        
+         
         return LocationGlobal(lat, lon, alt)
 
     def get_local_position(self):
@@ -154,8 +154,21 @@ class Navigator:
         """
         Gets the local origin of the drone (local position [0, 0, 0]) in terms of lat, lon and alt
         """
+        self.mav.mav.command_long_send(
+                                    self.mav.target_system,
+                                    self.mav.target_component,
+                                    mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE,
+                                    0,
+                                    242,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0)
+ 
         msg = self.mav.recv_match(type='HOME_POSITION', blocking=True)
-
+        print(msg)
         if msg:
             lat = msg.latitude / 1e7
             lon = msg.longitude / 1e7
@@ -188,8 +201,8 @@ class Navigator:
 
         print("MAVCTL: Taking Off to: " + str(altitude) + "m")
         self.mav.mav.command_long_send(
-                                        self.mav.mav.target_system,
-                                        self.mav.mav.target_component,
+                                        self.mav.target_system,
+                                        self.mav.target_component,
                                         mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
                                         0,
                                         0,
@@ -340,7 +353,7 @@ class Navigator:
         distance = util.LatLon_to_Distance(current_pos, target)
         start_time = time.time()
 
-        while not distance < 0.5:
+        while not distance < 5:
             current_pos = self.get_global_position()
             distance = util.LatLon_to_Distance(current_pos, target)
             if time.time() - start_time > timeout:
@@ -348,6 +361,4 @@ class Navigator:
                 return False
         
         return True
-
-        
 

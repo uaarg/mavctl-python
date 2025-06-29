@@ -4,19 +4,21 @@ from messages.Navigator import Navigator
 from messages import advanced
 import time
 
-mav = conn.connect()
+CONN_STR = "tcp:127.0.0.1:14550"
+MESSENGER_PORT = 14550
+
+mav = conn.connect(CONN_STR)
 master = Navigator(mav)
 
-
-while master.set_mode_wait() and master.wait_vehicle_armed():
+while master.wait_vehicle_armed():
+    pass
+    
+while not master.set_mode_wait():
     pass
 
-
-master.set_speed(2)
-time.sleep(2)
-advanced.simple_goto_local(master, 10, 10, 10)
-time.sleep(5)
-advanced.simple_goto_local(master, -10, -10, 10)
+print("moving")
+advanced.simple_goto_global(master, 53.496483, -113.548249, 20)
+print("Done")
 time.sleep(5)
 
 master.return_to_launch()
