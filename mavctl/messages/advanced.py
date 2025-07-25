@@ -21,7 +21,7 @@ def simple_goto_global(master, lat, lon, alt):
     type_mask = master.generate_typemask([0, 1, 2, 9])
     start_point = master.get_global_position()
     heading = Heading(start_point, LocationGlobal(lat, lon, alt))
-    master.set_position_global(type_mask = type_mask, lon = lon, lat = lat, alt = alt, yaw = radians(heading))
+    master.set_position_global(type_mask = type_mask, lon = lon, lat = lat, alt = alt, yaw = 0)
     print("Sent set position message")
     origin = master.get_global_origin()
     print("Waiting for drone to reach target")

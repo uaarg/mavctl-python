@@ -4,11 +4,9 @@ from messages.Navigator import Navigator
 from messages import advanced
 import time
 
-CONN_STR = "udp:127.0.0.1:14551"
-MESSENGER_PORT = 14552
-
 mav = conn.connect()
 master = Navigator(mav)
+
 
 while master.wait_vehicle_armed():
     pass
@@ -17,8 +15,12 @@ while not master.set_mode_wait():
     pass
 
 print("moving")
-advanced.simple_goto_local(master, 53.496483, -113.548249, 20)
-print("Done")
-time.sleep(5)
-
-master.return_to_launch()
+time.sleep(2)
+master.do_reposition(20, 53.496837, -113.545486, 20)
+print("Sent waypoint message")
+                        
+ack = master.mav.recv_match(type="COMMAND_ACK", blocking=True, timeout=5)
+if ack:
+    print(ack.result)
+else:
+    print("no ack recv")

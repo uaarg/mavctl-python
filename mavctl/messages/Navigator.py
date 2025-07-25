@@ -190,7 +190,7 @@ class Navigator:
 
 
 
-    def takeoff(self, altitude):
+    def takeoff(self, altitude, pitch=15):
         """
         Initiates a takeoff the drone to target altiude
 
@@ -205,7 +205,7 @@ class Navigator:
                                         self.mav.target_component,
                                         mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
                                         0,
-                                        0,
+                                        pitch,
                                         0,
                                         0,
                                         0,
@@ -214,6 +214,32 @@ class Navigator:
                                         altitude)
 
         self.wait_target_reached(LocationLocal(0, 0, -altitude))
+
+    def vtol_takeoff(self, altitude, pitch=15):
+        """
+        Initiates a takeoff the drone to target altiude
+
+        Altitude: Altituide to take off to in meters
+
+        NOTE: Positive is upwards
+        """
+
+        print("MAVCTL: Taking Off to: " + str(altitude) + "m")
+        self.mav.mav.command_long_send(
+                                        self.mav.target_system,
+                                        self.mav.target_component,
+                                        mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+                                        0,
+                                        pitch,
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        altitude)
+
+        self.wait_target_reached(LocationLocal(0, 0, -altitude))
+
 
     def return_to_launch(self):
         print("MAVCTL: RTL")
@@ -323,6 +349,28 @@ class Navigator:
                                                         yaw_rate)
 
 
+    def do_reposition(self,
+               radius,
+               lat,
+               lon,
+               alt):
+        # A method for autonomous waypoint navigation in GUIDED mode for Plane.
+        
+
+        self.mav.mav.command_int_send(
+                self.mav.target_system,
+                self.mav.target_component,
+                mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                mavutil.mavlink.MAV_CMD_DO_REPOSITION,
+                0,
+                1,
+                -1,
+                0,
+                radius,
+                0,
+                int(lat * 1e7),
+                int(lon * 1e7),
+                alt)
 
                             
 

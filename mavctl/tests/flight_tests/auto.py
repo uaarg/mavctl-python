@@ -17,8 +17,4 @@ while master.wait_vehicle_armed():
 while not master.set_mode_wait():
     pass
 
-master.takeoff(10)
-time.sleep(5)
-advanced.simple_goto_global(master, 53.496970, -113.545194, 20)
 
-master.return_to_launch()
