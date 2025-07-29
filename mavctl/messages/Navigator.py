@@ -41,6 +41,9 @@ class Navigator:
         print("MAVCTL: Armed!")
    
     def wait_vehicle_armed(self):
+        """
+        Waits for the vehicle to be armed. See samples directory for examples
+        """
         print("MAVCTL: Waiting for vehicle to arm")
         self.mav.motors_armed_wait()
         print("Armed!")
@@ -108,18 +111,7 @@ class Navigator:
                 if current_mode_id == mode_id:
                     print("MAVCTL: Set to " + mode + " mode")
                     return True
-
                     
-
-    def send_status_message(self, message: str):
-        """
-        Sends message to GCS
-        WIP, does not quite work yet, try messing around with different status message sending methods
-        """
-        self.mav.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE,
-                                     message.encode())
-        print("MAVCTL Message: " + message)
-
     def get_global_position(self):
         """
         Gets Global Position of drone.
@@ -284,7 +276,10 @@ class Navigator:
                                afz=0,
                                yaw=0,
                                yaw_rate=0):
-    
+        """
+            Set position in local/relative coordinates. Can also set velocity/acceleration setpoints
+            x, y, z is in meters in NED coordinates (down is positive)
+        """    
         
         self.mav.mav.set_position_target_local_ned_send(
                                                         0,
@@ -306,7 +301,12 @@ class Navigator:
    
 
     def set_speed(self, speed):
-   
+    """
+        Adjusts the global speed parameter.
+        (WIP) DO NOT USE IN REAL FLIGHT, THIS METHOD HAS NOT BEEN VERIFIED YET.
+    """
+
+
         self.mav.mav.param_set_send(
                 self.mav.target_system,
                 self.mav.target_component,
@@ -329,7 +329,11 @@ class Navigator:
                             afz=0,
                             yaw=0,
                             yaw_rate=0):
-
+        """
+            Set position in global coordinates. Can also set velocity/acceleration setpoints
+            lat, lon, and altitude. Altitude depends on the coordinate frame chosen
+        """    
+        
 
         self.mav.mav.set_position_target_global_int_send(0,
                                                         self.mav.target_system,
@@ -354,8 +358,10 @@ class Navigator:
                lat,
                lon,
                alt):
-        # A method for autonomous waypoint navigation in GUIDED mode for Plane.
-        
+        """
+        Similar to set_position_global but is intended for use with plane frame types. 
+        Alt is set to be relative altitude (ground is 0m)
+        """
 
         self.mav.mav.command_int_send(
                 self.mav.target_system,
@@ -396,7 +402,9 @@ class Navigator:
         return True
 
     def wait_target_reached_global(self, target, timeout = 30):
-
+        """
+        Waits for the drone to reach specified target (in global coordinates)
+        """
         current_pos = self.get_global_position()
         distance = util.LatLon_to_Distance(current_pos, target)
         start_time = time.time()
