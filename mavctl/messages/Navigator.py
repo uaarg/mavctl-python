@@ -379,8 +379,41 @@ class Navigator:
                 alt)
 
                             
+    def transition_mc(self): 
+        # A method to transition from fixed wing to multi-copter
+        # Normal Transition is default, force immediate is not recommended as it can cause damage to the vehicle 
+
+        self.mav.mav.command_long_send(
+                self.mav.target_system,
+                self.mav.target_component,
+                mavutil.mavlink.MAV_CMD_DO_VTOL_TRANSITION,
+                0,
+                mavutil.mavlink.MAV_VTOL_STATE_MC,
+                0, # Normal Transition and not a force immediate 
+                0,
+                0,
+                0,
+                0,
+                0)
 
 
+                    
+    def transition_fw(self): 
+        # A method to transition from multi-copter to forward flight
+        # Normal Transition is default, force immediate is not recommended as it can cause damage to the vehicle 
+
+        self.mav.mav.command_long_send(
+                self.mav.target_system,
+                self.mav.target_component,
+                mavutil.mavlink.MAV_CMD_DO_VTOL_TRANSITION,
+                0,
+                mavutil.mavlink.MAV_VTOL_STATE_MC,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0)
 
 
     def wait_target_reached(self, target, tolerance=0.05, timeout = 30) -> bool:
