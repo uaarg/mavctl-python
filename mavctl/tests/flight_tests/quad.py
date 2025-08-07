@@ -22,6 +22,12 @@ master.do_reposition(0, 53.492843, -113.549665, 10)
 time.sleep(30)
 print("Transitioning to Forward Flight")
 master.transition_fw()
+                        
+ack = master.mav.recv_match(type="COMMAND_ACK", blocking=True, timeout=5)
+if ack:
+    print(ack.result)
+else:
+    print("no ack recv")
 time.sleep(20)
 master.do_reposition(20, 53.496837, -113.545486, 20)
 print("moving")

@@ -301,10 +301,10 @@ class Navigator:
    
 
     def set_speed(self, speed):
-    """
-        Adjusts the global speed parameter.
-        (WIP) DO NOT USE IN REAL FLIGHT, THIS METHOD HAS NOT BEEN VERIFIED YET.
-    """
+    
+    
+        #Adjusts the global speed parameter.
+        #(WIP) DO NOT USE IN REAL FLIGHT, THIS METHOD HAS NOT BEEN VERIFIED YET.
 
 
         self.mav.mav.param_set_send(
