@@ -1,7 +1,10 @@
-import time 
+import time
+from typing import Literal 
+from math import radians, atan
+
+from mavctl.messages.Navigator import Navigator
 from messages import util
 from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
-from math import radians, atan
 from messages.util import Heading, LatLon_to_Distance
 
 # This file is meant for implementing more advanced features in mavctl
@@ -9,8 +12,9 @@ from messages.util import Heading, LatLon_to_Distance
 # This tests the wait target reached and has been verified to work
 
 def simple_goto_local(master, x, y, z): 
-
-    # Mimics simple_goto from dronekit, includes the right yaw angle so that the drone faces where it needs to go.
+    """Mimics simple_goto from dronekit, 
+    includes the right yaw angle so that 
+    the drone faces where it needs to go."""
 
     type_mask = master.generate_typemask([0, 1, 2, 9])
     angle = atan(y/x) 
@@ -27,3 +31,21 @@ def simple_goto_global(master, lat, lon, alt):
     print("Waiting for drone to reach target")
     master.wait_target_reached_global(LocationGlobal(lat, lon, alt))
     print("reached target")
+
+def do_precision_landing(master: Navigator,
+                         mode: Literal["REQUIRED", "OPPORTUNISTIC"]) -> None:
+    """
+    This function sets the drone into precision landing mode.
+
+    Parameters:
+        mode (str): Either "REQUIRED" or "OPPORTUNISTIC".
+
+            REQUIRED:
+                The vehicle searches for a target if none is visible when
+                landing is initiated, and performs precision landing if found.
+
+            OPPORTUNISTIC:
+                The vehicle uses precision landing only if the target is visible
+                at landing initiation; otherwise it performs a normal landing.
+    """
+    pass

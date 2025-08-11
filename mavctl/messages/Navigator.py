@@ -1,3 +1,4 @@
+from typing import Literal, Optional
 from pymavlink import mavutil
 import time
 from messages import util
@@ -232,6 +233,58 @@ class Navigator:
 
         self.wait_target_reached(LocationLocal(0, 0, -altitude))
 
+    def land(self,
+             land_mode: Literal[0,1,2],
+             abort_alt: float = 0,
+             yaw_angle: Optional[float] = None,
+             latitude: Optional[float] = None,
+             longitude: Optional[float] = None,
+             ):
+        """
+        Initiate a landing sequence.
+
+        Parameters:
+            abort_alt (float):
+                Minimum target altitude if landing is aborted
+                use system default if not specified. Units: meters.
+
+            land_mode (0, 1, 2):
+                Precision land mode:
+                    0: Precision land disabled
+                    1: opportunistic
+                    2: required 
+
+            yaw_angle (float, optional):
+                Desired yaw angle in degrees.
+                Default is to follow the current system yaw heading mode
+
+            latitude (float, optional):
+                Latitude in decimal degrees.
+
+            longitude (float, optional):
+                Longitude in decimal degrees.
+        """
+
+        # Runtime validation
+        if land_mode not in (0, 1, 2):
+            raise ValueError("land_mode must be 0, 1, or 2.")
+
+        if land_mode == 0 and (latitude is None or longitude is None): 
+            raise ValueError("specify latitude and longitude for disabled precision landing")
+           
+        self.mav.mav.command_long_send(
+                                        self.mav.target_system,
+                                        self.mav.target_component,
+                                        mavutil.mavlink.MAV_CMD_NAV_LAND,
+                                        0,
+                                        abort_alt,
+                                        land_mode,
+                                        0,
+                                        yaw_angle,
+                                        latitude,
+                                        longitude,
+                                        0)
+        #TODO:Add some sort of blocking function to stop execution till drone has landed 
 
     def return_to_launch(self):
         print("MAVCTL: RTL")
