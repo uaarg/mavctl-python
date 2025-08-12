@@ -1,20 +1,33 @@
-from typing import Literal, Optional
-from pymavlink import mavutil
+from typing import Literal, Optional, Tuple
+from dataclasses import dataclass
 import time
+from math import sqrt
+
+from pymavlink import mavutil
+
 from messages import util
 from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity
-from math import sqrt
+
+@dataclass
+class LandingTarget:
+    """
+    Data class to store position of landing target in MAV_FRAME_BODY_FRD frame.
+    FRD local frame aligned to the vehicle's attitude (x: Forward, y: Right, z: Down)
+    with an origin that travels with vehicle.
+    """
+    x: float
+    y: float
+    z: float
 
 class Navigator:
 
     def __init__(self, mav):
         self.mav = mav
-        
+
         self.TOLERANCE_CE = 0.05
         # For checking if the target position has been reached. This is a coefficient which is multiplied by the distance travelled.
         # The reason why a coefficient method was chosen is because the position tolerance should be a function of distance as opposed to being a constant
         # This method is preferred so that what happened at AEAC 2025 doesnt happen again.
-
 
     def arm(self):
         """
@@ -504,3 +517,22 @@ class Navigator:
         
         return True
 
+    def broadcast_landing_target(self, landing_target: LandingTarget) -> None: 
+        """
+        This function broadcasts the position of the landing target in MAV_FRAME_BODY_FRD frame.
+        """
+
+        time_usec = int(time.time() * 1000000) # convert to microseconds
+
+        self.mav.mav.landing_target_send(time_usec=time_usec,
+                        frame=mavutil.mavlink.MAV_FRAME_BODY_FRD,
+                        x=landing_target.x,
+                        y=landing_target.y,
+                        z=landing_target.z,
+                        q=(1,0,0,0),
+                        type=mavutil.mavlink.LANDING_TARGET_TYPE_VISION_OTHER,
+                        position_valid=1)
+
+    #TODO: Add implementation to return altitude reported by altimeter
+    def get_rel_altitude(self) -> float:
+        raise NotImplementedError
