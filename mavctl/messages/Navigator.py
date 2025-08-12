@@ -279,9 +279,6 @@ class Navigator:
         """
 
         # Runtime validation
-        if land_mode not in (0, 1, 2):
-            raise ValueError("land_mode must be 0, 1, or 2.")
-
         if land_mode == 0 and (latitude is None or longitude is None): 
             raise ValueError("specify latitude and longitude for disabled precision landing")
            

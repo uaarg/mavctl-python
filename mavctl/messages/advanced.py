@@ -37,7 +37,6 @@ def do_precision_landing(master: Navigator,
                          mode: Literal["REQUIRED", "OPPORTUNISTIC"]) -> None:
     """
     This function sets the drone into precision landing mode.
-    Only call this function when broadcasting landing target.
 
     Parameters:
         imaging_analysis_delegate: an object to the ImageAnalysisDelegate class
