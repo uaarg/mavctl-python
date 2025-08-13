@@ -1,19 +1,33 @@
-from pymavlink import mavutil
+from typing import Literal, Optional, Tuple
+from dataclasses import dataclass
 import time
-from messages import util
-from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity
 from math import sqrt
+
+from pymavlink import mavutil
+
+from messages import util
+from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity, Altitude
+
+@dataclass
+class LandingTarget:
+    """
+    Data class to store position of landing target in MAV_FRAME_BODY_FRD frame.
+    FRD local frame aligned to the vehicle's attitude (x: Forward, y: Right, z: Down)
+    with an origin that travels with vehicle.
+    """
+    x: float
+    y: float
+    z: float
 
 class Navigator:
 
     def __init__(self, mav):
         self.mav = mav
-        
+
         self.TOLERANCE_CE = 0.05
         # For checking if the target position has been reached. This is a coefficient which is multiplied by the distance travelled.
         # The reason why a coefficient method was chosen is because the position tolerance should be a function of distance as opposed to being a constant
         # This method is preferred so that what happened at AEAC 2025 doesnt happen again.
-
 
     def arm(self):
         """
@@ -180,6 +194,20 @@ class Navigator:
 
         return Velocity(north, east, down)
 
+    def get_altitude(self):
+        """
+        Gets the current system altitude, of various types
+        """
+        msg = self.mav.recv_match(type='ALTITUDE', blocking=True)
+        if msg:
+            mono = msg.altitude_monotonic
+            amsl = msg.altiude_amsl
+            local = msg.altitude_local
+            relative = msg.altitude_relative
+            terrain = msg.altitude_terrain
+            clearance = msg.bottom_clearance
+
+        return Altitude(mono, amsl, local, relative, terrain, clearance)
 
 
     def takeoff(self, altitude, pitch=15):
@@ -231,6 +259,60 @@ class Navigator:
                                         altitude)
 
         self.wait_target_reached(LocationLocal(0, 0, -altitude))
+
+    def land(self,
+             land_mode: Literal[0,1,2],
+             abort_alt: float = 0,
+             yaw_angle: Optional[float] = None,
+             latitude: Optional[float] = None,
+             longitude: Optional[float] = None,
+             ):
+        """
+        Initiate a landing sequence.
+
+        Parameters:
+            abort_alt (float):
+                Minimum target altitude if landing is aborted
+                use system default if not specified. Units: meters.
+
+            land_mode (0, 1, 2):
+                Precision land mode:
+                    0: Precision land disabled
+                    1: opportunistic
+                    2: required 
+
+            yaw_angle (float, optional):
+                Desired yaw angle in degrees.
+                Default is to follow the current system yaw heading mode
+
+            latitude (float, optional):
+                Latitude in decimal degrees.
+
+            longitude (float, optional):
+                Longitude in decimal degrees.
+        """
+
+        # Runtime validation
+        if land_mode == 0 and (latitude is None or longitude is None): 
+            raise ValueError("specify latitude and longitude for disabled precision landing")
+           
+        self.mav.mav.command_long_send(
+                                        self.mav.target_system,
+                                        self.mav.target_component,
+                                        mavutil.mavlink.MAV_CMD_NAV_LAND,
+                                        0,
+                                        abort_alt,
+                                        land_mode,
+                                        0,
+                                        yaw_angle,
+                                        latitude,
+                                        longitude,
+                                        0)
+        
+        current_position = self.get_local_position()
+        target = (current_position.north, current_position.down, 0)
+
+        self.wait_target_reached(target)
 
 
     def return_to_launch(self):
@@ -450,4 +532,20 @@ class Navigator:
                 return False
         
         return True
+
+    def broadcast_landing_target(self, landing_target: LandingTarget) -> None: 
+        """
+        This function broadcasts the position of the landing target in MAV_FRAME_BODY_FRD frame.
+        """
+
+        time_usec = int(time.time() * 1000000) # convert to microseconds
+
+        self.mav.mav.landing_target_send(time_usec=time_usec,
+                        frame=mavutil.mavlink.MAV_FRAME_BODY_FRD,
+                        x=landing_target.x,
+                        y=landing_target.y,
+                        z=landing_target.z,
+                        q=(1,0,0,0),
+                        type=mavutil.mavlink.LANDING_TARGET_TYPE_VISION_OTHER,
+                        position_valid=1)
 
