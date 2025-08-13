@@ -52,7 +52,7 @@ def do_precision_landing(master: Navigator,
                 at landing initiation; otherwise it performs a normal landing.
     """
     def callback(_, coords):
-        altitude = master.get_rel_altitude()
+        altitude = master.get_altitude().terrain # Gets the altitude above the terrain (as seen by an altimeter)
         target = LandingTarget(x=coords[0], y=coords[1], z=altitude)
         master.broadcast_landing_target(target)
 

@@ -6,7 +6,7 @@ from math import sqrt
 from pymavlink import mavutil
 
 from messages import util
-from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity
+from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity, Altitude
 
 @dataclass
 class LandingTarget:
@@ -194,6 +194,20 @@ class Navigator:
 
         return Velocity(north, east, down)
 
+    def get_altitude(self):
+        """
+        Gets the current system altitude, of various types
+        """
+        msg = self.mav.recv_match(type='ALTITUDE', blocking=True)
+        if msg:
+            mono = msg.altitude_monotonic
+            amsl = msg.altiude_amsl
+            local = msg.altitude_local
+            relative = msg.altitude_relative
+            terrain = msg.altitude_terrain
+            clearance = msg.bottom_clearance
+
+        return Altitude(mono, amsl, local, relative, terrain, clearance)
 
 
     def takeoff(self, altitude, pitch=15):
@@ -294,7 +308,12 @@ class Navigator:
                                         latitude,
                                         longitude,
                                         0)
-        #TODO:Add some sort of blocking function to stop execution till drone has landed 
+        
+        current_position = self.get_local_position()
+        target = (current_position.north, current_position.down, 0)
+
+        self.wait_target_reached(target)
+
 
     def return_to_launch(self):
         print("MAVCTL: RTL")
@@ -530,6 +549,3 @@ class Navigator:
                         type=mavutil.mavlink.LANDING_TARGET_TYPE_VISION_OTHER,
                         position_valid=1)
 
-    #TODO: Add implementation to return altitude reported by altimeter
-    def get_rel_altitude(self) -> float:
-        raise NotImplementedError
