@@ -1,5 +1,5 @@
 import time
-from typing import Literal 
+from typing import Callable, Literal 
 from math import radians, atan
 
 from mavctl.messages.Navigator import LandingTarget, Navigator
@@ -31,34 +31,3 @@ def simple_goto_global(master, lat, lon, alt):
     print("Waiting for drone to reach target")
     master.wait_target_reached_global(LocationGlobal(lat, lon, alt))
     print("reached target")
-
-def do_precision_landing(master: Navigator,
-                         imaging_analysis_delegate,
-                         mode: Literal["REQUIRED", "OPPORTUNISTIC"]) -> None:
-    """
-    This function sets the drone into precision landing mode.
-
-    Parameters:
-        imaging_analysis_delegate: an object to the ImageAnalysisDelegate class
-
-        mode (str): Either "REQUIRED" or "OPPORTUNISTIC".
-
-            REQUIRED:
-                The vehicle searches for a target if none is visible when
-                landing is initiated, and performs precision landing if found.
-
-            OPPORTUNISTIC:
-                The vehicle uses precision landing only if the target is visible
-                at landing initiation; otherwise it performs a normal landing.
-    """
-    def callback(_, coords):
-        altitude = master.get_altitude().terrain # Gets the altitude above the terrain (as seen by an altimeter)
-        target = LandingTarget(x=coords[0], y=coords[1], z=altitude)
-        master.broadcast_landing_target(target)
-
-    imaging_analysis_delegate.subscribe(callback)
-
-    if mode == "OPPORTUNISTIC":
-        master.land(land_mode=1)
-    elif mode == "REQUIRED":
-        master.land(land_mode=2)
