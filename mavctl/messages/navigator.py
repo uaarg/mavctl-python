@@ -15,9 +15,9 @@ class LandingTarget:
     FRD local frame aligned to the vehicle's attitude (x: Forward, y: Right, z: Down)
     with an origin that travels with vehicle.
     """
-    x: float
-    y: float
-    z: float
+    forward: float
+    right: float
+    altitude: float
 
 class Navigator:
 
