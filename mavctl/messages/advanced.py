@@ -2,10 +2,10 @@ import time
 from typing import Callable, Literal 
 from math import radians, atan
 
-from mavctl.messages.Navigator import LandingTarget, Navigator
-from messages import util
-from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
-from messages.util import Heading, LatLon_to_Distance
+from mavctl.messages.navigator import LandingTarget, Navigator
+from mavctl.messages import util
+from mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
+from mavctl.messages.util import Heading, LatLon_to_Distance
 
 # This file is meant for implementing more advanced features in mavctl
 

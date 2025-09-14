@@ -5,8 +5,8 @@ from math import sqrt
 
 from pymavlink import mavutil
 
-from messages import util
-from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity, Altitude
+from mavctl.messages import util
+from mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity, Altitude
 
 @dataclass
 class LandingTarget:
@@ -140,6 +140,26 @@ class Navigator:
             alt = msg.alt / 1000
          
         return LocationGlobal(lat, lon, alt)
+    
+    def get_geovector(point):
+        origin = self.get_global_position() 
+        distance = util.LatLon_to_Distance(point, origin)
+        bearing = radians(util.Heading(point, origin))
+
+        vectorX = distance * sin(bearing)
+        vectorY = distance * cos(bearing)
+
+        xRot = vectorX * cos(heading) - vectorY * sin(heading)
+        yRot = vectorx * sin(heading) + vectorY * cos(heading)
+        
+        return (xRot, yRot)
+
+    def get_heading(self):
+        msg = self.mav.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
+        if msg:
+            hdg = hdg / 100
+        return hdg
+  
 
     def get_local_position(self):
         """
@@ -263,9 +283,9 @@ class Navigator:
     def land(self,
              land_mode: Literal[0,1,2],
              abort_alt: float = 0,
-             yaw_angle: Optional[float] = None,
-             latitude: Optional[float] = None,
-             longitude: Optional[float] = None,
+             yaw_angle: Optional[float] = 0,
+             latitude: Optional[float] = 0,
+             longitude: Optional[float] = 0,
              ):
         """
         Initiate a landing sequence.
@@ -294,8 +314,7 @@ class Navigator:
 
         # Runtime validation
         if land_mode == 0 and (latitude is None or longitude is None): 
-            raise ValueError("specify latitude and longitude for disabled precision landing")
-           
+            raise ValueError("specify latitude and longitude for disabled precision landing") 
         self.mav.mav.command_long_send(
                                         self.mav.target_system,
                                         self.mav.target_component,
@@ -310,9 +329,10 @@ class Navigator:
                                         0)
         
         current_position = self.get_local_position()
+        current_position.alt = 0
         target = (current_position.north, current_position.down, 0)
 
-        self.wait_target_reached(target)
+        self.wait_target_reached(current_position)
 
 
     def return_to_launch(self):
@@ -330,11 +350,6 @@ class Navigator:
             0,
             0
         )
-
-
-
-
-
 
     def generate_typemask(self, keeps):
         # Generates typemask based on which values to be included
@@ -539,6 +554,8 @@ class Navigator:
         """
 
         time_usec = int(time.time() * 1000000) # convert to microseconds
+            
+        print(landing_target)
 
         self.mav.mav.landing_target_send(time_usec=time_usec,
                         frame=mavutil.mavlink.MAV_FRAME_BODY_FRD,
