@@ -1,7 +1,7 @@
 import math
 from math import radians, degrees, cos, sin, atan2, sqrt
 from pymavlink import mavutil
-from mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
+from src.modules.mavctl.mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
 
 
 def distance_to_target(target1, target2):

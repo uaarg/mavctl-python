@@ -5,8 +5,8 @@ from math import sqrt
 
 from pymavlink import mavutil
 
-from mavctl.messages import util
-from mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity, Altitude
+from src.modules.mavctl.mavctl.messages import util
+from src.modules.mavctl.mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity, Altitude
 
 @dataclass
 class LandingTarget:
@@ -556,13 +556,11 @@ class Navigator:
         time_usec = int(time.time() * 1000000) # convert to microseconds
             
         print(landing_target)
-
         self.mav.mav.landing_target_send(time_usec=time_usec,
-                        frame=mavutil.mavlink.MAV_FRAME_BODY_FRD,
-                        x=landing_target.x,
-                        y=landing_target.y,
-                        z=landing_target.z,
-                        q=(1,0,0,0),
-                        type=mavutil.mavlink.LANDING_TARGET_TYPE_VISION_OTHER,
-                        position_valid=1)
-
+                        target_num=0,
+                        frame=mavutil.mavlink.MAV_FRAME_LOCAL_OFFSET_NED,
+                        angle_x=landing_target.forward,
+                        angle_y=landing_target.right,
+                        distance=landing_target.altitude,
+                        size_x=0.52,
+                        size_y=0.52)
