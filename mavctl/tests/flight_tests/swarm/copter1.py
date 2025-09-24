@@ -17,17 +17,11 @@ mav2 = conn.connect(CONN_STR2)
 master2 = Navigator(mav2)
 
 
-while master1.wait_vehicle_armed():
-    pass
-
-while not master1.set_mode_wait():
+while not master1.wait_for_mode_and_arm():
     pass
 
 
-while master2.wait_vehicle_armed():
-    pass
-
-while not master2.set_mode_wait():
+while not master2.wait_for_mode_and_arm():
     pass
 
 
