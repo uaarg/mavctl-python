@@ -26,6 +26,14 @@ class LocationLocal(object):
         self.east = east
         self.down = down
         
+class Altitude(object):
+    def __init__(self, mono, amsl, local, relative, terrain, clearance):
+        self.mono = mono
+        self.amsl = amsl
+        self.local = local
+        self.relative = relative
+        self.terrain = terrain
+        self.clearance = clearance
 
 class Battery(object):
     
