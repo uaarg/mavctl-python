@@ -48,6 +48,16 @@ class Navigator:
         self.mav.motors_armed_wait()
         print("Armed!")
 
+    def wait_for_mode_and_arm(self, mode="GUIDED", timeout=None) -> bool:
+        """Wait for the vehicle to enter ``mode`` and to be armed"""
+        mode_ready = self.set_mode_wait(mode=mode, timeout=timeout)
+        if not mode_ready:
+            return False
+    
+        while not self.wait_vehicle_armed():
+            return True
+        pass
+
     def disarm(self):
         """
         Disarms the drone.
@@ -84,7 +94,6 @@ class Navigator:
         start_time = time.time()
         
         mode_mapping = self.mav.mode_mapping()
-        print(mode_mapping)
         if mode not in mode_mapping:
             raise ValueError("MAVCTL Error: Mode " + mode + "not recognized")
 
@@ -107,7 +116,6 @@ class Navigator:
 
             if msg:
                 current_mode_id = msg.custom_mode
-                print(current_mode_id, mode_id)
                 if current_mode_id == mode_id:
                     print("MAVCTL: Set to " + mode + " mode")
                     return True
@@ -450,4 +458,3 @@ class Navigator:
                 return False
         
         return True
-

@@ -11,10 +11,7 @@ mav = conn.connect()
 master = Navigator(mav)
 master.send_status_message("MAVCTL: Online")
 
-while master.wait_vehicle_armed():
-    pass
-
-while not master.set_mode_wait():
+while not master.wait_for_mode_and_arm():
     pass
 
 master.takeoff(10)
