@@ -58,8 +58,8 @@ class Connect:
             master = mavutil.mavlink_connection(ip, baud)
             msg_recv = master.recv_match(type="HEARTBEAT", blocking=False)
 
-            send_heartbeat_thread = threading.Thread(self.send_heartbeat)
-            recv_heartbeat_thread = threading.Thread(self.recv_heartbeat)
+            send_heartbeat_thread = threading.Thread(target = self.send_heartbeat)
+            recv_heartbeat_thread = threading.Thread(target = self.recv_heartbeat)
 
             send_heartbeat_thread.start()
             recv_heartbeat_thread.start()
