@@ -19,4 +19,4 @@ RUN . ~/venv-ardupilot/bin/activate && \
     ./waf copter
 
 CMD . /root/venv-ardupilot/bin/activate && \
-    Tools/autotest/sim_vehicle.py -v copter --no-mavproxy -w
+    Tools/autotest/sim_vehicle.py -v copter --no-mavproxy -w -S 10

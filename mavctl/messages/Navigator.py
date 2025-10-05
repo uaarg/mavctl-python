@@ -73,6 +73,20 @@ class Navigator:
         self.mav.motors_disarmed_wait()
         print("MAVCTL: Disarmed!")
 
+    def set_mode(self, mode: str) -> bool:
+        """
+        Waits for the specified mode to be selected.
+        Timesout after specified timeout
+
+        mode: Mode you want to change to
+        """
+        mode_mapping = self.mav.mode_mapping()
+        if mode not in mode_mapping:
+            raise ValueError("MAVCTL Error: Mode " + mode + "not recognized")
+
+        mode_id = mode_mapping[mode]
+        self.mav.set_mode(mode_id)
+
     def set_mode_wait(self, mode = "GUIDED", timeout = None) -> bool:
         """
         Waits for the specified mode to be selected.
