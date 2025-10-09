@@ -40,13 +40,28 @@ class Navigator:
         self.mav.motors_armed_wait()
         print("MAVCTL: Armed!")
    
-    def wait_vehicle_armed(self):
+    def wait_vehicle_armed(self, timeout = None) -> bool:
         """
         Waits for the vehicle to be armed. See samples directory for examples
         """
+        start_time = time.time()
         print("MAVCTL: Waiting for vehicle to arm")
-        self.mav.motors_armed_wait()
-        print("Armed!")
+        
+        if timeout is None:
+            self.mav.motors_armed_wait()
+            print("MAVCTL: Armed!")
+            return True
+        
+        else:
+            while True:
+                 if time.time() - start_time >= timeout: 
+                    print("MAVCTL: Waiting for vehicle to arm")
+                    return False
+                 
+                 if self.mav.motors_armed_wait():
+                     print("MAVCTL: Armed!")
+                     return True
+
 
     def disarm(self):
         """
