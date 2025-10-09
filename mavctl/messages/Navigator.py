@@ -58,7 +58,7 @@ class Navigator:
                     print("MAVCTL: Waiting for vehicle to arm")
                     return False
                  
-                 if self.mav.motors_armed_wait:
+                 if self.mav.motors_armed_wait():
                      print("MAVCTL: Armed!")
                      return True
 
