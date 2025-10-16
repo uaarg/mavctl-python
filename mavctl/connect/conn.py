@@ -12,9 +12,12 @@ class Connect:
                  baud: int = 57600,
                  heartbeat_timeout = None):
 
-        self.send_heartbeat_thread = threading.Thread(target = self.send_heartbeat)
-        self.recv_heartbeat_thread = threading.Thread(target = self.recv_heartbeat)
+        self._stop_event = threading.Event()
 
+
+
+        self.send_heartbeat_thread = threading.Thread(target = self.send_heartbeat, daemon = True)
+        self.recv_heartbeat_thread = threading.Thread(target = self.recv_heartbeat, daemon = True)
 
         self.mav = self.connect(ip = ip, baud = baud, heartbeat_timeout = heartbeat_timeout)
         self.heartbeat_start()
@@ -53,8 +56,9 @@ class Connect:
             self.recv_heartbeat_thread.start()
 
     def heartbeat_kill(self):
-            self.send_heartbeat_thread.join()
-            self.recv_heartbeat_thread.join()
+            self._stop_event.set()
+            self.send_heartbeat_thread.join(timeout=2)
+            self.recv_heartbeat_thread.join(timeout=2)
     
     def disconnect(self):
         self.heartbeat_kill()
