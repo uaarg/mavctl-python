@@ -3,30 +3,34 @@ from pymavlink import mavutil
 import time
 import threading
 from pymavlink import mavutil
+from mavctl.messages.navigator import Navigator
 
 class Connect:
-    def __init__(self,
+        
+    def __init__(self,                  
                  ip: str = "udp:127.0.0.1:14552",
                  baud: int = 57600,
                  heartbeat_timeout = None):
 
-        self.mav = self.connect(ip = ip, baud = baud, heartbeat_timeout=heartbeat_timeout) 
+        self.send_heartbeat_thread = threading.Thread(target = self.send_heartbeat)
+        self.recv_heartbeat_thread = threading.Thread(target = self.recv_heartbeat)
 
 
-    def send_heartbeat(self, interval: int = 1):
+        self.mav = self.connect(ip = ip, baud = baud, heartbeat_timeout = heartbeat_timeout)
+        self.heartbeat_start()
+
+
+    def send_heartbeat(self, interval: int = 0.25):
 
         try:
             while True:
-                self.mav.mav.command_long_send(
-                    self.mav.target_system,
-                    self.mav.target_component,
-                    mavutil.mavlink.HEARTBEAT,
-                    mavutil.mavlink.MAV_TYPE_GCS,
-                    mavutil.mavlink.MAV_AUTOPILOT_INVALID,
-                    0,
-                    0,
-                    0)
-
+                self.mav.mav.heartbeat_send(
+                    type=mavutil.mavlink.MAV_TYPE_GCS,
+                    autopilot=mavutil.mavlink.MAV_AUTOPILOT_INVALID,
+                    base_mode=0,
+                    custom_mode=0,
+                    system_status=mavutil.mavlink.MAV_STATE_ACTIVE
+                ) 
                 time.sleep(interval)
 
         except Exception as e:
@@ -36,15 +40,26 @@ class Connect:
 
         try:
             while True:
-                msg_recv = self.mav.mav.recv_match(type="HEARTBEAT", blocking=False)
+                msg_recv = self.mav.recv_match(type="HEARTBEAT", blocking=False)
 
                 # Create disconnect handling here... 
-
                 time.sleep(interval)
 
         except Exception as e:
             raise Exception("MAVCTL ERROR: Failed to send heartbeat!: ", e)
  
+    def heartbeat_start(self):
+            self.send_heartbeat_thread.start()
+            self.recv_heartbeat_thread.start()
+
+    def heartbeat_kill(self):
+            self.send_heartbeat_thread.join()
+            self.recv_heartbeat_thread.join()
+    
+    def disconnect(self):
+        self.heartbeat_kill()
+        self.mav.close()
+        print("MAVCTL: Disconnecting!")
 
     # Function to connect to mavlink 
     def connect(self, ip: str = "udp:127.0.0.1:14552", # Default IP and port for the UAARG Autopilot Simulator
@@ -57,13 +72,6 @@ class Connect:
             # NOTE: Using default parameters built into pymavlink, look into how this can be customized
             master = mavutil.mavlink_connection(ip, baud)
             msg_recv = master.recv_match(type="HEARTBEAT", blocking=False)
-
-            send_heartbeat_thread = threading.Thread(target = self.send_heartbeat)
-            recv_heartbeat_thread = threading.Thread(target = self.recv_heartbeat)
-
-            send_heartbeat_thread.start()
-            recv_heartbeat_thread.start()
-
             while not msg_recv:
                 i = 0
                 if heartbeat_timeout != None:
@@ -76,7 +84,6 @@ class Connect:
                 print("MAVCTL: Waiting for heartbeat ...")
                 msg_recv = master.recv_match(type="HEARTBEAT", blocking=False)
                 time.sleep(1)
-
             print("MAVCTL: Connected at: ", ip)
             return master
         except Exception as e:

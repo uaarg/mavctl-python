@@ -3,17 +3,13 @@ import time
 from mavctl.messages import util
 from mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity
 from math import sqrt
-from mavctl.connect.conn import Connect
 
 
-class Navigator(Connect):
+class Navigator:
 
-    def __init__(self,
-                 ip: str = "udp:127.0.0.1:14552",
-                 baud: int = 57600,
-                 heartbeat_timeout = None):
-
-        super().__init__(ip = ip, baud = baud, heartbeat_timeout = heartbeat_timeout)
+    def __init__(self, mav):
+        self.mav = mav
+        
 
     def arm(self):
         """
