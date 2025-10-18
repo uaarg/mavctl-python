@@ -1,15 +1,14 @@
-from connect import conn
+from mavctl.connect.conn import Connect
 from pymavlink import mavutil
-from messages.Navigator import Navigator
-from messages.messenger import Messenger
-from messages import advanced
+from mavctl.messages.navigator import Navigator
+from mavctl.messages.messenger import Messenger
+from mavctl.messages import advanced
 import time
 
-CONN_STR = "udp:127.0.0.1:14551"
+CONN_STR = "udp:127.0.0.1:14550"
 
-mav = conn.connect()
-master = Navigator(mav)
-master.send_status_message("MAVCTL: Online")
+mav = Connect(ip = CONN_STR)
+master = Navigator(mav.mav)
 
 while master.wait_vehicle_armed():
     pass

@@ -1,8 +1,8 @@
 import time 
-from messages import util
-from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
+from mavctl.messages import util
+from mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
 from math import radians, atan
-from messages.util import Heading, LatLon_to_Distance
+from mavctl.messages.util import Heading, LatLon_to_Distance
 
 # This file is meant for implementing more advanced features in mavctl
 
