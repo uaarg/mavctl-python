@@ -1,16 +1,14 @@
 from pymavlink import mavutil
 import time
-from mavctl.messages import util
-from mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity
+from src.modules.mavctl.mavctl.messages import util
+from src.modules.mavctl.mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity
 from math import sqrt
-
 
 class Navigator:
 
     def __init__(self, mav):
         self.mav = mav
         
-
     def arm(self):
         """
         Arms the drone.

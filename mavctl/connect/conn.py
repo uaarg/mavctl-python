@@ -3,7 +3,7 @@ from pymavlink import mavutil
 import time
 import threading
 from pymavlink import mavutil
-from mavctl.messages.navigator import Navigator
+from src.modules.mavctl.mavctl.messages.navigator import Navigator
 
 class Connect:
         
