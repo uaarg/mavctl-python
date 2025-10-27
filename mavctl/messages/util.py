@@ -74,4 +74,3 @@ def Heading(point1, point2):
 
     return heading
 
-
