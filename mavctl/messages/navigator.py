@@ -1,11 +1,6 @@
 from typing import Literal, Optional, Tuple
 from dataclasses import dataclass
 import time
-<<<<<<< HEAD
-from src.modules.mavctl.mavctl.messages import util
-from src.modules.mavctl.mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity
-=======
->>>>>>> origin/precision-landing
 from math import sqrt
 
 from pymavlink import mavutil
@@ -562,11 +557,14 @@ class Navigator:
         time_usec = int(time.time() * 1000000) # convert to microseconds
             
         print(landing_target)
+
         self.mav.mav.landing_target_send(time_usec=time_usec,
-                        target_num=1,
+                        target_num=0,
                         frame=mavutil.mavlink.MAV_FRAME_BODY_FRD,
                         angle_x=-landing_target.forward,
                         angle_y=-landing_target.right,
                         distance=landing_target.altitude,
-                        size_x=0,
-                        size_y=0)
+                        size_x = 0.1,
+                        size_y = 0.1,
+                        position_valid=0
+                        )
