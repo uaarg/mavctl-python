@@ -4,12 +4,11 @@ This module provides the HeartbeatManager class, which monitors MAVLink heartbea
 messages from the drone and automatically detects connection loss based on missed
 heartbeats. It supports callback-based notifications for connection state changes.
 """
+# pylint: disable=too-many-instance-attributes
 
 import threading
 import time
 from typing import Callable
-
-from pymavlink import mavutil  # pylint: disable=import-error
 
 
 class HeartbeatManager:
