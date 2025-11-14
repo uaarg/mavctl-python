@@ -79,7 +79,7 @@ class HeartbeatManager:
                 if not self.is_connected:
                     self.is_connected = True
                     callback = self._callbacks['on_connection_established']
-                    if callback:
+                    if callback is not None:
                         callback()
             else:
                 self.missed_heartbeats += 1
@@ -87,7 +87,7 @@ class HeartbeatManager:
                         and self.is_connected):
                     self.is_connected = False
                     callback = self._callbacks['on_connection_lost']
-                    if callback:
+                    if callback is not None:
                         callback()
 
     def get_connection_status(self) -> bool:
