@@ -3,6 +3,7 @@ from pymavlink import mavutil
 import time
 import threading
 from pymavlink import mavutil
+from mavctl.connect.heartbeat import HeartbeatManager
 from mavctl.messages.navigator import Navigator
 
 class Connect:
@@ -12,16 +13,11 @@ class Connect:
                  baud: int = 57600,
                  heartbeat_timeout = None):
 
-        self._stop_event = threading.Event()
-
-
-
-        self.send_heartbeat_thread = threading.Thread(target = self.send_heartbeat, daemon = True)
-        self.recv_heartbeat_thread = threading.Thread(target = self.recv_heartbeat, daemon = True)
-
         self.mav = self.connect(ip = ip, baud = baud, heartbeat_timeout = heartbeat_timeout)
-        self.heartbeat_start()
-
+        
+        self._heartbeat_manager = HeartbeatManager(self.mav)
+        self._heartbeat_manager.start()
+        
 
     def send_heartbeat(self, interval: int = 0.25):
 

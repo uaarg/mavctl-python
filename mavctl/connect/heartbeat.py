@@ -9,7 +9,7 @@ heartbeats. It supports callback-based notifications for connection state change
 import threading
 import time
 from typing import Callable
-
+from pymavlink import mavutil
 
 class HeartbeatManager:
     """Monitor MAVLink heartbeat messages and detect connection loss.
@@ -36,6 +36,7 @@ class HeartbeatManager:
         self.is_connected = False
         self._stop_event = threading.Event()
         self._monitor_thread = None
+        self._send_thread = None
         self._callbacks = {
             'on_connection_lost': None,
             'on_connection_established': None,
@@ -55,14 +56,19 @@ class HeartbeatManager:
         self._stop_event.clear()
         self._monitor_thread = threading.Thread(target=self._monitor_heartbeat)
         self._monitor_thread.daemon = True
+        self._send_thread = threading.Thread(target=self._send_heartbeat)
+        self._send_thread.daemon = True
         self._monitor_thread.start()
+        self._send_thread.start()
 
     def stop(self):
         """Stop the heartbeat monitoring system."""
         if self._monitor_thread:
             self._stop_event.set()
             self._monitor_thread.join()
+            self._send_thread.join()
             self._monitor_thread = None
+            self._send_thread = None
 
     def _monitor_heartbeat(self):
         """Monitor heartbeat messages and manage connection status."""
@@ -89,6 +95,18 @@ class HeartbeatManager:
                     callback = self._callbacks['on_connection_lost']
                     if callback is not None:
                         callback()
+
+    def _send_heartbeat(self):
+        """Send heartbeat messages"""
+        while not self._stop_event.is_set():
+            self.mav.mav.heartbeat_send(
+                    type=mavutil.mavlink.MAV_TYPE_GCS,
+                    autopilot=mavutil.mavlink.MAV_AUTOPILOT_INVALID,
+                    base_mode=0,
+                    custom_mode=0,
+                    system_status=mavutil.mavlink.MAV_STATE_ACTIVE
+                ) 
+            time.sleep(self.heartbeat_timeout) 
 
     def get_connection_status(self) -> bool:
         """Get the current connection status."""
