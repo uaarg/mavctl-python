@@ -99,7 +99,6 @@ class Navigator:
         start_time = time.time()
         
         mode_mapping = self.mav.mode_mapping()
-        print(mode_mapping)
         if mode not in mode_mapping:
             raise ValueError("MAVCTL Error: Mode " + mode + "not recognized")
 
