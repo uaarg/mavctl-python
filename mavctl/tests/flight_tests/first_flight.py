@@ -1,7 +1,6 @@
 from mavctl.connect.conn import Connect
 from pymavlink import mavutil
 from mavctl.messages.navigator import Navigator
-from mavctl.messages.messenger import Messenger
 from mavctl.messages import advanced
 import time
 
@@ -10,10 +9,7 @@ CONN_STR = "udp:127.0.0.1:14551"
 connect = Connect(ip = CONN_STR)
 drone = Navigator(connect.master)
 
-while drone.wait_vehicle_armed():
-    pass
-
-while not drone.set_mode_wait():
+while not drone.wait_for_mode_and_arm():
     pass
 
 drone.takeoff(10)

@@ -44,6 +44,15 @@ class Navigator:
         self.master.motors_armed_wait()
         print("Armed!")
 
+    def wait_for_mode_and_arm(self, mode="GUIDED", timeout=None) -> bool:
+        """Wait for the vehicle to enter ``mode`` and to be armed"""
+        mode_ready = self.set_mode_wait(mode=mode, timeout=timeout)
+        if not mode_ready:
+            return False
+        while not self.wait_vehicle_armed():
+            return True
+        pass
+
     def disarm(self):
         """
         Disarms the drone.
@@ -444,4 +453,3 @@ class Navigator:
                 return False
         
         return True
-
