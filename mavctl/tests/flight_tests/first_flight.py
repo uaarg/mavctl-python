@@ -1,24 +1,23 @@
-from connect import conn
+from mavctl.connect.conn import Connect
 from pymavlink import mavutil
-from messages.Navigator import Navigator
-from messages.messenger import Messenger
-from messages import advanced
+from mavctl.messages.navigator import Navigator
+from mavctl.messages.messenger import Messenger
+from mavctl.messages import advanced
 import time
 
 CONN_STR = "udp:127.0.0.1:14551"
 
-mav = conn.connect()
-master = Navigator(mav)
-master.send_status_message("MAVCTL: Online")
+connect = Connect(ip = CONN_STR)
+drone = Navigator(connect.master)
 
-while master.wait_vehicle_armed():
+while drone.wait_vehicle_armed():
     pass
 
-while not master.set_mode_wait():
+while not drone.set_mode_wait():
     pass
 
-master.takeoff(10)
+drone.takeoff(10)
 time.sleep(5)
-advanced.simple_goto_global(master, 53.496970, -113.545194, 20)
+advanced.simple_goto_global(drone, 53.496970, -113.545194, 20)
 
-master.return_to_launch()
+drone.return_to_launch()

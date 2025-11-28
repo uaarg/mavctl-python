@@ -18,7 +18,7 @@ class HeartbeatManager:
     Triggers callbacks when connection is established or lost after N missed
     heartbeats.
     """
-    def __init__(self, mav, heartbeat_timeout: float = 1.0, max_missed_heartbeats: int = 2):
+    def __init__(self, master, heartbeat_timeout: float = 1.0, max_missed_heartbeats: int = 2):
         """Initialize the heartbeat manager.
 
         Args:
@@ -28,7 +28,7 @@ class HeartbeatManager:
             max_missed_heartbeats: Number of consecutive heartbeats that can be
                 missed before connection is considered lost (default 2).
         """
-        self.mav = mav
+        self.master = master
         self.heartbeat_timeout = heartbeat_timeout
         self.max_missed_heartbeats = max_missed_heartbeats
         self.last_heartbeat = 0
@@ -73,7 +73,7 @@ class HeartbeatManager:
     def _monitor_heartbeat(self):
         """Monitor heartbeat messages and manage connection status."""
         while not self._stop_event.is_set():
-            msg = self.mav.recv_match(
+            msg = self.master.recv_match(
                 type="HEARTBEAT",
                 blocking=True,
                 timeout=self.heartbeat_timeout
@@ -99,7 +99,7 @@ class HeartbeatManager:
     def _send_heartbeat(self):
         """Send heartbeat messages"""
         while not self._stop_event.is_set():
-            self.mav.mav.heartbeat_send(
+            self.master.mav.heartbeat_send(
                     type=mavutil.mavlink.MAV_TYPE_GCS,
                     autopilot=mavutil.mavlink.MAV_AUTOPILOT_INVALID,
                     base_mode=0,

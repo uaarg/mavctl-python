@@ -13,9 +13,9 @@ class Connect:
                  baud: int = 57600,
                  heartbeat_timeout = None):
 
-        self.mav = self.connect(ip = ip, baud = baud, heartbeat_timeout = heartbeat_timeout)
+        self.master = self.connect(ip = ip, baud = baud, heartbeat_timeout = heartbeat_timeout)
         
-        self._heartbeat_manager = HeartbeatManager(self.mav)
+        self._heartbeat_manager = HeartbeatManager(self.master)
         self._heartbeat_manager.start()
         
 
@@ -23,7 +23,7 @@ class Connect:
 
         try:
             while True:
-                self.mav.mav.heartbeat_send(
+                self.master.mav.heartbeat_send(
                     type=mavutil.mavlink.MAV_TYPE_GCS,
                     autopilot=mavutil.mavlink.MAV_AUTOPILOT_INVALID,
                     base_mode=0,
@@ -39,7 +39,7 @@ class Connect:
 
         try:
             while True:
-                msg_recv = self.mav.recv_match(type="HEARTBEAT", blocking=False)
+                msg_recv = self.master.recv_match(type="HEARTBEAT", blocking=False)
 
                 # Create disconnect handling here... 
                 time.sleep(interval)
@@ -58,7 +58,7 @@ class Connect:
     
     def disconnect(self):
         self.heartbeat_kill()
-        self.mav.close()
+        self.master.close()
         print("MAVCTL: Disconnecting!")
 
     # Function to connect to mavlink 

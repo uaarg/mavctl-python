@@ -7,8 +7,8 @@ from math import sqrt
 
 class Navigator:
 
-    def __init__(self, mav):
-        self.mav = mav
+    def __init__(self, master):
+        self.master = master
         
 
     def arm(self):
@@ -18,9 +18,9 @@ class Navigator:
         NOTE: ONLY FOR USE IN SIMULATED SCRIPTS
         """
 
-        self.mav.mav.command_long_send(
-            self.mav.target_system,
-            self.mav.target_component,
+        self.master.mav.command_long_send(
+            self.master.target_system,
+            self.master.target_component,
             mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
             0,
             1,
@@ -33,7 +33,7 @@ class Navigator:
         )   
 
         print("MAVCTL: Waiting for vehicle to arm")
-        self.mav.motors_armed_wait()
+        self.master.motors_armed_wait()
         print("MAVCTL: Armed!")
    
     def wait_vehicle_armed(self):
@@ -41,7 +41,7 @@ class Navigator:
         Waits for the vehicle to be armed. See samples directory for examples
         """
         print("MAVCTL: Waiting for vehicle to arm")
-        self.mav.motors_armed_wait()
+        self.master.motors_armed_wait()
         print("Armed!")
 
     def disarm(self):
@@ -51,9 +51,9 @@ class Navigator:
         NOTE: ONLY FOR USE IN SIMULATED SCRIPTS
         """
 
-        self.mav.mav.command_long_send(
-            self.mav.target_system,
-            self.mav.target_component,
+        self.master.mav.command_long_send(
+            self.master.target_system,
+            self.master.target_component,
             mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
             0,
             0,
@@ -66,7 +66,7 @@ class Navigator:
         )    
         
         print("MAVCTL: Waiting for vehicle to disarm")
-        self.mav.motors_disarmed_wait()
+        self.master.motors_disarmed_wait()
         print("MAVCTL: Disarmed!")
 
     def set_mode_wait(self, mode = "GUIDED", timeout = None) -> bool:
@@ -79,8 +79,7 @@ class Navigator:
         """ 
         start_time = time.time()
         
-        mode_mapping = self.mav.mode_mapping()
-        print(mode_mapping)
+        mode_mapping = self.master.mode_mapping()
         if mode not in mode_mapping:
             raise ValueError("MAVCTL Error: Mode " + mode + "not recognized")
 
@@ -92,18 +91,17 @@ class Navigator:
                    print("MAVCTL: Timeout waiting for " + mode + " mode")
                    return False 
 
-            self.mav.mav.request_data_stream_send(
-                    self.mav.target_system,
-                    self.mav.target_component,
+            self.master.mav.request_data_stream_send(
+                    self.master.target_system,
+                    self.master.target_component,
                     mavutil.mavlink.MAV_DATA_STREAM_ALL,
                     1,
                     1)
 
-            msg = self.mav.recv_match(type = "HEARTBEAT", blocking = True, timeout = 0.25)
+            msg = self.master.recv_match(type = "HEARTBEAT", blocking = True, timeout = 0.25)
 
             if msg:
                 current_mode_id = msg.custom_mode
-                print(current_mode_id, mode_id)
                 if current_mode_id == mode_id:
                     print("MAVCTL: Set to " + mode + " mode")
                     return True
@@ -115,7 +113,7 @@ class Navigator:
         Altitude is a value which is measured from sea level and is positive
 
         """
-        msg = self.mav.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
+        msg = self.master.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
         if msg:
             lat = msg.lat / 1e7
             lon = msg.lon / 1e7
@@ -130,7 +128,7 @@ class Navigator:
         DOWN is positive
         """
         
-        msg = self.mav.recv_match(type='LOCAL_POSITION_NED', blocking=True)
+        msg = self.master.recv_match(type='LOCAL_POSITION_NED', blocking=True)
         if msg:
             north = msg.x
             east = msg.y
@@ -142,9 +140,9 @@ class Navigator:
         """
         Gets the local origin of the drone (local position [0, 0, 0]) in terms of lat, lon and alt
         """
-        self.mav.mav.command_long_send(
-                                    self.mav.target_system,
-                                    self.mav.target_component,
+        self.master.mav.command_long_send(
+                                    self.master.target_system,
+                                    self.master.target_component,
                                     mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE,
                                     0,
                                     242,
@@ -155,7 +153,7 @@ class Navigator:
                                     0,
                                     0)
  
-        msg = self.mav.recv_match(type='HOME_POSITION', blocking=True)
+        msg = self.master.recv_match(type='HOME_POSITION', blocking=True)
         print(msg)
         if msg:
             lat = msg.latitude / 1e7
@@ -168,7 +166,7 @@ class Navigator:
         """
         Gets velocity of drone in NED coordinates
         """
-        msg = self.mav.recv_match(type='LOCAL_POSITION_NED', blocking=True)
+        msg = self.master.recv_match(type='LOCAL_POSITION_NED', blocking=True)
         if msg:
             north = msg.vx
             east = msg.vy
@@ -188,9 +186,9 @@ class Navigator:
         """
 
         print("MAVCTL: Taking Off to: " + str(altitude) + "m")
-        self.mav.mav.command_long_send(
-                                        self.mav.target_system,
-                                        self.mav.target_component,
+        self.master.mav.command_long_send(
+                                        self.master.target_system,
+                                        self.master.target_component,
                                         mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
                                         0,
                                         pitch,
@@ -213,9 +211,9 @@ class Navigator:
         """
 
         print("MAVCTL: Taking Off to: " + str(altitude) + "m")
-        self.mav.mav.command_long_send(
-                                        self.mav.target_system,
-                                        self.mav.target_component,
+        self.master.mav.command_long_send(
+                                        self.master.target_system,
+                                        self.master.target_component,
                                         mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
                                         0,
                                         pitch,
@@ -231,9 +229,9 @@ class Navigator:
 
     def return_to_launch(self):
         print("MAVCTL: RTL")
-        self.mav.mav.command_long_send(
-            self.mav.target_system,
-            self.mav.target_component,
+        self.master.mav.command_long_send(
+            self.master.target_system,
+            self.master.target_component,
             mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH,
             0,
             0,
@@ -277,10 +275,10 @@ class Navigator:
             x, y, z is in meters in NED coordinates (down is positive)
         """    
         
-        self.mav.mav.set_position_target_local_ned_send(
+        self.master.mav.set_position_target_local_ned_send(
                                                         0,
-                                                        self.mav.target_system,
-                                                        self.mav.target_component,
+                                                        self.master.target_system,
+                                                        self.master.target_component,
                                                         coordinate_frame,
                                                         type_mask,
                                                         x,
@@ -303,9 +301,9 @@ class Navigator:
         #(WIP) DO NOT USE IN REAL FLIGHT, THIS METHOD HAS NOT BEEN VERIFIED YET.
 
 
-        self.mav.mav.param_set_send(
-                self.mav.target_system,
-                self.mav.target_component,
+        self.master.mav.param_set_send(
+                self.master.target_system,
+                self.master.target_component,
                 b'WPNAV_SPEED', 
                 speed*100, # Speed in m/s is converted to cm/s
                 mavutil.mavlink.MAV_PARAM_TYPE_REAL32)
@@ -331,9 +329,9 @@ class Navigator:
         """    
         
 
-        self.mav.mav.set_position_target_global_int_send(0,
-                                                        self.mav.target_system,
-                                                        self.mav.target_component,
+        self.master.mav.set_position_target_global_int_send(0,
+                                                        self.master.target_system,
+                                                        self.master.target_component,
                                                         coordinate_frame,
                                                         type_mask,
                                                         int(lat * 10000000),
@@ -359,9 +357,9 @@ class Navigator:
         Alt is set to be relative altitude (ground is 0m)
         """
 
-        self.mav.mav.command_int_send(
-                self.mav.target_system,
-                self.mav.target_component,
+        self.master.mav.command_int_send(
+                self.master.target_system,
+                self.master.target_component,
                 mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
                 mavutil.mavlink.MAV_CMD_DO_REPOSITION,
                 0,
@@ -379,9 +377,9 @@ class Navigator:
         # A method to transition from fixed wing to multi-copter
         # Normal Transition is default, force immediate is not recommended as it can cause damage to the vehicle 
 
-        self.mav.mav.command_long_send(
-                self.mav.target_system,
-                self.mav.target_component,
+        self.master.mav.command_long_send(
+                self.master.target_system,
+                self.master.target_component,
                 mavutil.mavlink.MAV_CMD_DO_VTOL_TRANSITION,
                 0,
                 mavutil.mavlink.MAV_VTOL_STATE_MC,
@@ -398,9 +396,9 @@ class Navigator:
         # A method to transition from multi-copter to forward flight
         # Normal Transition is default, force immediate is not recommended as it can cause damage to the vehicle 
 
-        self.mav.mav.command_long_send(
-                self.mav.target_system,
-                self.mav.target_component,
+        self.master.mav.command_long_send(
+                self.master.target_system,
+                self.master.target_component,
                 mavutil.mavlink.MAV_CMD_DO_VTOL_TRANSITION,
                 0,
                 mavutil.mavlink.MAV_VTOL_STATE_MC,
