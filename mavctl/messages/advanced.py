@@ -1,8 +1,8 @@
 import time 
-from messages import util
-from messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
+from mavctl.messages import util
+from mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal
 from math import radians, atan
-from messages.util import Heading, LatLon_to_Distance
+from mavctl.messages.util import Heading, LatLon_to_Distance
 
 # This file is meant for implementing more advanced features in mavctl
 
@@ -22,8 +22,5 @@ def simple_goto_global(master, lat, lon, alt):
     start_point = master.get_global_position()
     heading = Heading(start_point, LocationGlobal(lat, lon, alt))
     master.set_position_global(type_mask = type_mask, lon = lon, lat = lat, alt = alt, yaw = 0)
-    print("Sent set position message")
     origin = master.get_global_origin()
-    print("Waiting for drone to reach target")
     master.wait_target_reached_global(LocationGlobal(lat, lon, alt))
-    print("reached target")

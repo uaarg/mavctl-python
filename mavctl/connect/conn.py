@@ -3,6 +3,7 @@ from pymavlink import mavutil
 import time
 import threading
 from pymavlink import mavutil
+from mavctl.connect.heartbeat import HeartbeatManager
 from mavctl.messages.navigator import Navigator
 
 class Connect:
@@ -12,22 +13,17 @@ class Connect:
                  baud: int = 57600,
                  heartbeat_timeout = None):
 
-        self._stop_event = threading.Event()
-
-
-
-        self.send_heartbeat_thread = threading.Thread(target = self.send_heartbeat, daemon = True)
-        self.recv_heartbeat_thread = threading.Thread(target = self.recv_heartbeat, daemon = True)
-
-        self.mav = self.connect(ip = ip, baud = baud, heartbeat_timeout = heartbeat_timeout)
-        self.heartbeat_start()
-
+        self.master = self.connect(ip = ip, baud = baud, heartbeat_timeout = heartbeat_timeout)
+        
+        self._heartbeat_manager = HeartbeatManager(self.master)
+        self._heartbeat_manager.start()
+        
 
     def send_heartbeat(self, interval: int = 0.25):
 
         try:
             while True:
-                self.mav.mav.heartbeat_send(
+                self.master.mav.heartbeat_send(
                     type=mavutil.mavlink.MAV_TYPE_GCS,
                     autopilot=mavutil.mavlink.MAV_AUTOPILOT_INVALID,
                     base_mode=0,
@@ -43,7 +39,7 @@ class Connect:
 
         try:
             while True:
-                msg_recv = self.mav.recv_match(type="HEARTBEAT", blocking=False)
+                msg_recv = self.master.recv_match(type="HEARTBEAT", blocking=False)
 
                 # Create disconnect handling here... 
                 time.sleep(interval)
@@ -62,7 +58,7 @@ class Connect:
     
     def disconnect(self):
         self.heartbeat_kill()
-        self.mav.close()
+        self.master.close()
         print("MAVCTL: Disconnecting!")
 
     # Function to connect to mavlink 
