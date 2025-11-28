@@ -157,7 +157,7 @@ class Navigator:
     def get_heading(self):
         msg = self.mav.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
         if msg:
-            hdg = hdg / 100
+            hdg = msg.hdg / 100
         return hdg
   
 
