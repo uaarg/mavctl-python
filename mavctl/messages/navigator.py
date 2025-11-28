@@ -53,7 +53,6 @@ class Navigator:
         mode_ready = self.set_mode_wait(mode=mode, timeout=timeout)
         if not mode_ready:
             return False
-    
         while not self.wait_vehicle_armed():
             return True
         pass

@@ -1,6 +1,6 @@
 from connect import conn
 from pymavlink import mavutil
-from messages.Navigator import Navigator
+from messages.navigator import Navigator
 from messages.messenger import Messenger
 from messages import advanced
 import time
