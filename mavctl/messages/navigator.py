@@ -11,7 +11,7 @@ class Navigator:
         self.master = master
         
 
-    def arm(self):
+    def DO_NOT_USE_ARM(self):
         """
         Arms the drone.
         NOTE: UNDER NO CIRCUMSTANCE SHOULD THIS BE USED IN A REAL FLIGHT SCRIPT
@@ -53,7 +53,7 @@ class Navigator:
             return True
         pass
 
-    def disarm(self):
+    def DO_NOT_USE_DISARM(self):
         """
         Disarms the drone.
         NOTE: UNDER NO CIRCUMSTANCE SHOULD THIS BE USED IN A REAL FLIGHT SCRIPT
@@ -77,6 +77,32 @@ class Navigator:
         print("MAVCTL: Waiting for vehicle to disarm")
         self.master.motors_disarmed_wait()
         print("MAVCTL: Disarmed!")
+
+    def DO_NOT_USE_SET_MODE(self, mode = "GUIDED"):
+        """
+        Sets the mode of the drone
+
+        mode: Mode to be set to
+        """
+        mode_mapping = self.master.mode_mapping()
+        if mode not in mode_mapping:
+            raise ValueError("MAVCTL Error: Mode " + mode + "not recognized")
+
+        mode_id = mode_mapping[mode]
+
+        self.master.mav.command_long_send(
+                                    self.master.target_system,
+                                    self.master.target_component,
+                                    mavutil.mavlink.MAV_CMD_DO_SET_MODE,
+                                    0,
+                                    1,
+                                    mode_id,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0)
+ 
 
     def set_mode_wait(self, mode = "GUIDED", timeout = None) -> bool:
         """
