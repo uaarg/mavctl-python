@@ -2,7 +2,7 @@ from mavctl.messages.navigator import Navigator
 from mavctl.connect.conn import Connect
 import time
 
-CONN_STR = "udp:127.0.0.1:14551"
+CONN_STR = "udp:127.0.0.1:14553"
 
 connect = Connect(ip = CONN_STR)
 drone = Navigator(connect.master)
