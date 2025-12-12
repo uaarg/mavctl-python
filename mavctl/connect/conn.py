@@ -4,7 +4,6 @@ import time
 import threading
 from pymavlink import mavutil
 from mavctl.connect.heartbeat import HeartbeatManager
-from mavctl.messages.navigator import Navigator
 
 class Connect:
         

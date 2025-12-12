@@ -2,13 +2,20 @@ from pymavlink import mavutil
 import time
 from mavctl.messages import util
 from mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity
+from mavctl.connect.conn import Connect
 from math import sqrt
 
 
 class Navigator:
 
-    def __init__(self, master):
-        self.master = master
+    def __init__(self,
+                 ip: str = "udp:127.0.0.1:14551",
+                 baud: int = 57600,
+                 heartbeat_timeout = None):
+
+        self.master = Connect(ip = ip, baud = baud, heartbeat_timeout = heartbeat_timeout).master
+
+        
         
 
     def DO_NOT_USE_ARM(self):
