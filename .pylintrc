@@ -1,0 +1,32 @@
+[MASTER]
+ignore=tests,bin
+
+[MESSAGES CONTROL]
+# Disable warnings that are common in pymavlink / high-level API
+disable=
+    missing-module-docstring,
+    missing-function-docstring,
+    missing-class-docstring,
+    invalid-name,
+    broad-except,
+    attribute-defined-outside-init,
+    protected-access,
+    R0902
+
+[TYPECHECK]
+ignored-modules=
+    pymavlink
+    pymavlink.*
+
+[BASIC]
+good-names=i,j,k,
+           x,y,z,
+           lat,lon,alt,
+           msg,mav,seq
+
+[DESIGN]
+max-args=10
+max-locals=20
+max-branches=15
+max-statements=60
+min-public-methods=0

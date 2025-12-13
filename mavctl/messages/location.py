@@ -1,51 +1,42 @@
-from pymavlink import mavutil
+from dataclasses import dataclass
 from math import sqrt
+from typing import Optional
 
+@dataclass
+class LocationGlobal:
+    lat: float
+    lon: float
+    alt: Optional[float] = None
 
-'''
-Classes adapted from here:
-https://github.com/dronekit/dronekit-python/blob/master/dronekit/__init__.py
+@dataclass
+class LocationGlobalRelative:
+    lat: float
+    lon: float
+    alt: Optional[float] = None
 
-'''
+@dataclass
+class LocationLocal:
+    north: float
+    east: float
+    down: float
 
-class LocationGlobal(object):
-    def __init__(self, lat, lon, alt=None):
-        self.lat = lat
-        self.lon = lon
-        self.alt = alt
+@dataclass
+class Battery:
+    voltage: float  # in Volts
+    current: Optional[float]  # in Amps
+    level: Optional[int]      # battery level %
 
-class LocationGlobalRelative(object):
-    def __init__(self, lat, lon, alt=None):
-        self.lat = lat
-        self.lon = lon
-        self.alt = alt
-
-class LocationLocal(object):
-    def __init__(self, north, east, down):
-        self.north = north
-        self.east = east
-        self.down = down
-        
-
-class Battery(object):
-    
-    def __init__(self, voltage, current, level):
+    def __init__(self, voltage: float, current: int, level: int):
         self.voltage = voltage / 1000.0
-        if current == -1:
-            self.current = None
-        else:
-            self.current = current / 100.0
+        self.current = None if current == -1 else current / 100.0
+        self.level = None if level == -1 else level
 
-        if level == -1:
-            self.level = None
-        else:
-            self.level = level
+@dataclass
+class Velocity:
+    north: float
+    east: float
+    down: float
 
-class Velocity(object):
-    def __init__(self, north, east, down):
-        self.north = north
-        self.east = east
-        self.down = down
-
-    def magnitude(self):
+    def magnitude(self) -> float:
+        """Compute the 3D magnitude of the velocity vector."""
         return sqrt(self.north ** 2 + self.east ** 2 + self.down ** 2)

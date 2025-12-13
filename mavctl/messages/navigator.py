@@ -1,48 +1,136 @@
-from pymavlink import mavutil
 import time
-from mavctl.messages import util
-from mavctl.messages.location import LocationGlobal, LocationGlobalRelative, LocationLocal, Velocity
-from math import sqrt
+from math import atan
+from dataclasses import dataclass
+from typing import Optional, Iterable
+
+from pymavlink import mavutil
+
+from mavctl._internal import util
+from mavctl.messages.location import LocationGlobal, LocationLocal, Velocity
+from mavctl.connect.conn import Connect
+from mavctl._internal.logger import get_logger
+
+# Initialize the Logger
+LOGGER = get_logger(__name__)
+
+# ----------------------
+# Dataclasses for setpoints
+# ----------------------
+@dataclass
+class PositionSetpointLocal:
+    x: float = 0
+    y: float = 0
+    z: float = 0
+    vx: float = 0
+    vy: float = 0
+    vz: float = 0
+    afx: float = 0
+    afy: float = 0
+    afz: float = 0
+    yaw: float = 0
+    yaw_rate: float = 0
 
 
-class Navigator:
+@dataclass
+class PositionSetpointGlobal:
+    lat: float = 0
+    lon: float = 0
+    alt: float = 0
+    vx: float = 0
+    vy: float = 0
+    vz: float = 0
+    afx: float = 0
+    afy: float = 0
+    afz: float = 0
+    yaw: float = 0
+    yaw_rate: float = 0
 
-    def __init__(self, master):
-        self.master = master
-        
 
-    def DO_NOT_USE_ARM(self):
+# ----------------------
+# Navigator Class
+# ----------------------
+class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-attributes
+    """Navigator class for MAVLink drones with logging and helper functions."""
+
+    def __init__(self, ip: str = "udp:127.0.0.1:14551",
+                 baud: int = 57600,
+                 heartbeat_timeout: Optional[int] = None):
         """
-        Arms the drone.
-        NOTE: UNDER NO CIRCUMSTANCE SHOULD THIS BE USED IN A REAL FLIGHT SCRIPT
-        NOTE: ONLY FOR USE IN SIMULATED SCRIPTS
-        """
+        Initialize a MAVLink connection.
 
+        Args:
+            ip: Connection string (UDP/serial).
+            baud: Serial baud rate (ignored for UDP).
+            heartbeat_timeout: Optional heartbeat timeout.
+        """
+        self.master = Connect(ip=ip, baud=baud, heartbeat_timeout=heartbeat_timeout).master
+        LOGGER.info("Navigator connected to %s", ip)
+
+    # ----------------------
+    # Arm / Disarm
+    # ----------------------
+    def arm(self) -> None:
+        """Arms the vehicle (simulation only)."""
+        self._send_command_arm_disarm(True)
+        LOGGER.info("Waiting for vehicle to arm...")
+        self.master.motors_armed_wait()
+        LOGGER.info("Vehicle armed.")
+
+    def disarm(self) -> None:
+        """Disarms the vehicle (simulation only)."""
+        self._send_command_arm_disarm(False)
+        LOGGER.info("Waiting for vehicle to disarm...")
+        self.master.motors_disarmed_wait()
+        LOGGER.info("Vehicle disarmed.")
+
+    def _send_command_arm_disarm(self, arm: bool) -> None:
+        """Helper to arm/disarm vehicle."""
         self.master.mav.command_long_send(
             self.master.target_system,
             self.master.target_component,
             mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
             0,
-            1,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-        )   
+            int(arm),
+            0, 0, 0, 0, 0, 0
+        )
 
-        print("MAVCTL: Waiting for vehicle to arm")
-        self.master.motors_armed_wait()
-        print("MAVCTL: Armed!")
-   
-    def wait_vehicle_armed(self):
+    # ----------------------
+    # Mode management
+    # ----------------------
+    def set_mode_wait(self, mode: str = "GUIDED", timeout: Optional[int] = None) -> bool:
         """
-        Waits for the vehicle to be armed. See samples directory for examples
+        Wait until the vehicle is in the specified mode.
+
+        Args:
+            mode: Target mode (e.g., "GUIDED").
+            timeout: Maximum wait time in seconds.
+
+        Returns:
+            True if mode is set, False if timed out.
         """
-        print("MAVCTL: Waiting for vehicle to arm")
-        self.master.motors_armed_wait()
-        print("Armed!")
+        start_time = time.time()
+        mode_mapping = self.master.mode_mapping()
+        if mode not in mode_mapping:
+            raise ValueError(f"Mode {mode} not recognized")
+        mode_id = mode_mapping[mode]
+        LOGGER.info("Waiting for mode %s", mode)
+
+        while True:
+            if timeout and (time.time() - start_time) >= timeout:
+                LOGGER.warning("Timeout waiting for mode %s", mode)
+                return False
+
+            self.master.mav.request_data_stream_send(
+                self.master.target_system,
+                self.master.target_component,
+                mavutil.mavlink.MAV_DATA_STREAM_ALL,
+                1,
+                1
+            )
+            msg = self.master.recv_match(type="HEARTBEAT", blocking=True, timeout=0.25)
+            if msg and getattr(msg, "custom_mode", None) == mode_id:
+                LOGGER.info("Mode set to %s", mode)
+                return True
 
     def wait_for_mode_and_arm(self, mode="GUIDED", timeout=None) -> bool:
         """Wait for the vehicle to enter ``mode`` and to be armed"""
@@ -51,431 +139,256 @@ class Navigator:
             return False
         while not self.wait_vehicle_armed():
             return True
-        pass
+        LOGGER.warning("MAVCTL: Failed to wait for vehicle arm")
+        return False
 
-    def DO_NOT_USE_DISARM(self):
+    def wait_vehicle_armed(self):
         """
-        Disarms the drone.
-        NOTE: UNDER NO CIRCUMSTANCE SHOULD THIS BE USED IN A REAL FLIGHT SCRIPT
-        NOTE: ONLY FOR USE IN SIMULATED SCRIPTS
+        Waits for the vehicle to be armed. See samples directory for examples
         """
+        LOGGER.info("MAVCTL: Waiting for vehicle to arm")
+        self.master.motors_armed_wait()
+        LOGGER.info("MAVCTL: Armed!")
 
+    # ----------------------
+    # Position / Velocity access
+    # ----------------------
+    def get_global_position(self) -> LocationGlobal:
+        """Returns the current global position."""
+        msg = self.master.recv_match(type="GLOBAL_POSITION_INT", blocking=True)
+        if msg:
+            return LocationGlobal(msg.lat / 1e7, msg.lon / 1e7, msg.alt / 1000)
+        return LocationGlobal(0, 0, 0)
+
+    def get_local_position(self) -> LocationLocal:
+        """Returns the current local NED position."""
+        msg = self.master.recv_match(type="LOCAL_POSITION_NED", blocking=True)
+        if msg:
+            return LocationLocal(msg.x, msg.y, msg.z)
+        return LocationLocal(0, 0, 0)
+
+    def get_velocity(self) -> Velocity:
+        """Returns the current local velocity in NED."""
+        msg = self.master.recv_match(type="LOCAL_POSITION_NED", blocking=True)
+        if msg:
+            return Velocity(msg.vx, msg.vy, msg.vz)
+        return Velocity(0, 0, 0)
+
+    # ----------------------
+    # Takeoff
+    # ----------------------
+    def takeoff(self, altitude: float, pitch: float = 15) -> None:
+        """Initiates a takeoff to the target altitude."""
+        LOGGER.info("Takeoff to %.2f m", altitude)
         self.master.mav.command_long_send(
             self.master.target_system,
             self.master.target_component,
-            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
             0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-        )    
-        
-        print("MAVCTL: Waiting for vehicle to disarm")
-        self.master.motors_disarmed_wait()
-        print("MAVCTL: Disarmed!")
+            pitch,
+            0, 0, 0, 0, 0,
+            altitude
+        )
+        self.wait_target_reached(PositionSetpointLocal(z=-altitude))
 
-    def DO_NOT_USE_SET_MODE(self, mode = "GUIDED"):
-        """
-        Sets the mode of the drone
+    # ----------------------
+    # Setpoints
+    # ----------------------
+    def set_position_local_ned(self, setpoint: PositionSetpointLocal,
+                               coordinate_frame: int = mavutil.mavlink.MAV_FRAME_LOCAL_NED,
+                               type_mask: int = 0x07FF) -> None:
+        """Send a local NED setpoint."""
+        self.master.mav.set_position_target_local_ned_send(
+            0,
+            self.master.target_system,
+            self.master.target_component,
+            coordinate_frame,
+            type_mask,
+            setpoint.x, setpoint.y, setpoint.z,
+            setpoint.vx, setpoint.vy, setpoint.vz,
+            setpoint.afx, setpoint.afy, setpoint.afz,
+            setpoint.yaw, setpoint.yaw_rate
+        )
+        LOGGER.debug("Local setpoint sent: %s", setpoint)
 
-        mode: Mode to be set to
-        """
-        mode_mapping = self.master.mode_mapping()
-        if mode not in mode_mapping:
-            raise ValueError("MAVCTL Error: Mode " + mode + "not recognized")
+    def set_position_global(self, setpoint: PositionSetpointGlobal,
+                            coordinate_frame: int = mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                            type_mask: int = 0x07FF) -> None:
+        """Send a global setpoint."""
+        self.master.mav.set_position_target_global_int_send(
+            0,
+            self.master.target_system,
+            self.master.target_component,
+            coordinate_frame,
+            type_mask,
+            int(setpoint.lat * 1e7),
+            int(setpoint.lon * 1e7),
+            setpoint.alt,
+            setpoint.vx, setpoint.vy, setpoint.vz,
+            setpoint.afx, setpoint.afy, setpoint.afz,
+            setpoint.yaw, setpoint.yaw_rate
+        )
+        LOGGER.debug("Global setpoint sent: %s", setpoint)
 
-        mode_id = mode_mapping[mode]
-
-        self.master.mav.command_long_send(
-                                    self.master.target_system,
-                                    self.master.target_component,
-                                    mavutil.mavlink.MAV_CMD_DO_SET_MODE,
-                                    0,
-                                    1,
-                                    mode_id,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    0)
- 
-
-    def set_mode_wait(self, mode = "GUIDED", timeout = None) -> bool:
-        """
-        Waits for the specified mode to be selected.
-        Timesout after specified timeout
-
-        mode: Mode you want to wait for, leave blank for the most part
-        timeout: Timeout in seconds, leave blank to have no timeout
-        """ 
+    # ----------------------
+    # Target reaching
+    # ----------------------
+    def wait_target_reached(self, target: Optional[PositionSetpointLocal] = None,
+                            tolerance: float = 0.05, timeout: int = 30) -> bool:
+        """Wait until the local target is reached within tolerance."""
+        if target is None:
+            target = PositionSetpointLocal()
         start_time = time.time()
-        
-        mode_mapping = self.master.mode_mapping()
-        if mode not in mode_mapping:
-            raise ValueError("MAVCTL Error: Mode " + mode + "not recognized")
-
-        mode_id = mode_mapping[mode]
-        print("MAVCTL: Waiting for " + mode + " mode")
         while True:
-            if timeout:
-                if time.time() - start_time >= timeout: 
-                   print("MAVCTL: Timeout waiting for " + mode + " mode")
-                   return False 
+            current_pos = self.get_local_position()
+            if util.check_target_reached(current_pos, target, tolerance):
+                LOGGER.info("Target reached locally: %s", target)
+                return True
+            if (time.time() - start_time) > timeout:
+                LOGGER.warning("Timeout: Failed to reach local target: %s", target)
+                return False
 
-            self.master.mav.request_data_stream_send(
-                    self.master.target_system,
-                    self.master.target_component,
-                    mavutil.mavlink.MAV_DATA_STREAM_ALL,
-                    1,
-                    1)
+    def wait_target_reached_global(self, target: Optional[PositionSetpointGlobal] = None,
+                                   timeout: int = 30) -> bool:
+        """Wait until the global target is reached within tolerance."""
+        if target is None:
+            target = PositionSetpointGlobal()
+        start_time = time.time()
+        while True:
+            current_pos = self.get_global_position()
+            distance = util.LatLon_to_Distance(current_pos, target)
+            if distance < 5:
+                LOGGER.info("Target reached globally: %s", target)
+                return True
+            if (time.time() - start_time) > timeout:
+                LOGGER.warning("Timeout: Failed to reach global target: %s", target)
+                return False
 
-            msg = self.master.recv_match(type = "HEARTBEAT", blocking = True, timeout = 0.25)
+    # ----------------------
+    # Simple goto commands
+    # ----------------------
+    def simple_goto_local(self, x: float, y: float, z: float) -> None:
+        """Move drone to local NED coordinates."""
+        type_mask = self.master.generate_typemask([0, 1, 2, 9])
+        yaw_angle = atan(y / x) if x != 0 else 0
+        setpoint = PositionSetpointLocal(x=x, y=y, z=-z, yaw=yaw_angle)
+        self.set_position_local_ned(setpoint, type_mask=type_mask)
+        self.wait_target_reached(setpoint)
 
-            if msg:
-                current_mode_id = msg.custom_mode
-                if current_mode_id == mode_id:
-                    print("MAVCTL: Set to " + mode + " mode")
-                    return True
-                    
-    def get_global_position(self):
-        """
-        Gets Global Position of drone.
-        returns lat, lon, and altitude with respect to GLOBAL coordinates
-        Altitude is a value which is measured from sea level and is positive
+    def simple_goto_global(self, lat: float, lon: float, alt: float) -> None:
+        """Move drone to global coordinates."""
+        type_mask = self.generate_typemask([0, 1, 2, 9])
+        start_point = self.get_global_position()
+        yaw = util.Heading(start_point, LocationGlobal(lat, lon, alt))
+        setpoint = PositionSetpointGlobal(lat=lat, lon=lon, alt=alt, yaw=yaw)
+        self.set_position_global(setpoint, type_mask=type_mask)
+        self.wait_target_reached_global(setpoint)
 
-        """
-        msg = self.master.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
-        if msg:
-            lat = msg.lat / 1e7
-            lon = msg.lon / 1e7
-            alt = msg.alt / 1000
-         
-        return LocationGlobal(lat, lon, alt)
-
-    def get_local_position(self):
-        """
-        Gets Local Position of drone.
-        returns x, y, z in NED coordinates with respect to local origin
-        DOWN is positive
-        """
-        
-        msg = self.master.recv_match(type='LOCAL_POSITION_NED', blocking=True)
-        if msg:
-            north = msg.x
-            east = msg.y
-            down = msg.z
-
-        return LocationLocal(north, east, down)
-
-    def get_global_origin(self):
-        """
-        Gets the local origin of the drone (local position [0, 0, 0]) in terms of lat, lon and alt
-        """
+    # ----------------------
+    # VTOL transitions
+    # ----------------------
+    def transition_mc(self) -> None:
+        """Transition from fixed-wing to multi-copter mode."""
         self.master.mav.command_long_send(
-                                    self.master.target_system,
-                                    self.master.target_component,
-                                    mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE,
-                                    0,
-                                    242,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    0)
- 
-        msg = self.master.recv_match(type='HOME_POSITION', blocking=True)
-        print(msg)
-        if msg:
-            lat = msg.latitude / 1e7
-            lon = msg.longitude / 1e7
-            alt = msg.altitude / 1000
+            self.master.target_system,
+            self.master.target_component,
+            mavutil.mavlink.MAV_CMD_DO_VTOL_TRANSITION,
+            0,
+            mavutil.mavlink.MAV_VTOL_STATE_MC,
+            0, 0, 0, 0, 0, 0
+        )
+        LOGGER.info("VTOL transition: multi-copter")
 
-        return LocationGlobal(lat, lon, alt)
-
-    def get_velocity(self):
-        """
-        Gets velocity of drone in NED coordinates
-        """
-        msg = self.master.recv_match(type='LOCAL_POSITION_NED', blocking=True)
-        if msg:
-            north = msg.vx
-            east = msg.vy
-            down = msg.vz
-
-        return Velocity(north, east, down)
-
-
-
-    def takeoff(self, altitude, pitch=15):
-        """
-        Initiates a takeoff the drone to target altiude
-
-        Altitude: Altituide to take off to in meters
-
-        NOTE: Positive is upwards
-        """
-
-        print("MAVCTL: Taking Off to: " + str(altitude) + "m")
+    def transition_fw(self) -> None:
+        """Transition from multi-copter to fixed-wing (forward flight) mode."""
         self.master.mav.command_long_send(
-                                        self.master.target_system,
-                                        self.master.target_component,
-                                        mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
-                                        0,
-                                        pitch,
-                                        0,
-                                        0,
-                                        0,
-                                        0,
-                                        0,
-                                        altitude)
+            self.master.target_system,
+            self.master.target_component,
+            mavutil.mavlink.MAV_CMD_DO_VTOL_TRANSITION,
+            0,
+            mavutil.mavlink.MAV_VTOL_STATE_FW,
+            0, 0, 0, 0, 0, 0
+        )
+        LOGGER.info("VTOL transition: forward flight")
 
-        self.wait_target_reached(LocationLocal(0, 0, -altitude))
-
-    def vtol_takeoff(self, altitude, pitch=15):
-        """
-        Initiates a takeoff the drone to target altiude
-
-        Altitude: Altituide to take off to in meters
-
-        NOTE: Positive is upwards
-        """
-
-        print("MAVCTL: Taking Off to: " + str(altitude) + "m")
-        self.master.mav.command_long_send(
-                                        self.master.target_system,
-                                        self.master.target_component,
-                                        mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
-                                        0,
-                                        pitch,
-                                        0,
-                                        0,
-                                        0,
-                                        0,
-                                        0,
-                                        altitude)
-
-        self.wait_target_reached(LocationLocal(0, 0, -altitude))
-
-
-    def return_to_launch(self):
-        print("MAVCTL: RTL")
+    # ----------------------
+    # Return to Launch
+    # ----------------------
+    def return_to_launch(self) -> None:
+        """Command the vehicle to return to its launch location."""
         self.master.mav.command_long_send(
             self.master.target_system,
             self.master.target_component,
             mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH,
             0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
+            0, 0, 0, 0, 0, 0, 0
         )
+        LOGGER.info("Return to Launch (RTL) command sent")
 
-
-
-
-
-
-    def generate_typemask(self, keeps):
-        # Generates typemask based on which values to be included
-        mask = 0
-        for bit in keeps:
-            mask |= (0 << bit)
-        return mask
-
-
-    def set_position_local_ned(self,
-                               coordinate_frame = mavutil.mavlink.MAV_FRAME_LOCAL_NED,
-                               type_mask=0x07FF,
-                               x=0,
-                               y=0,
-                               z=0,
-                               vx=0,
-                               vy=0,
-                               vz=0,
-                               afx=0,
-                               afy=0, 
-                               afz=0,
-                               yaw=0,
-                               yaw_rate=0):
+    # ----------------------
+    # Repositioning
+    # ----------------------
+    def do_reposition(self, radius: float, lat: float, lon: float, alt: float) -> None:
         """
-            Set position in local/relative coordinates. Can also set velocity/acceleration setpoints
-            x, y, z is in meters in NED coordinates (down is positive)
-        """    
-        
-        self.master.mav.set_position_target_local_ned_send(
-                                                        0,
-                                                        self.master.target_system,
-                                                        self.master.target_component,
-                                                        coordinate_frame,
-                                                        type_mask,
-                                                        x,
-                                                        y,
-                                                        z,
-                                                        vx,
-                                                        vy,
-                                                        vz,
-                                                        afx,
-                                                        afy,
-                                                        afz,
-                                                        yaw,
-                                                        yaw_rate)
-   
+        Reposition vehicle for plane frame types (altitude relative to ground).
 
-    def set_speed(self, speed):
-    
-    
-        #Adjusts the global speed parameter.
-        #(WIP) DO NOT USE IN REAL FLIGHT, THIS METHOD HAS NOT BEEN VERIFIED YET.
-
-
-        self.master.mav.param_set_send(
-                self.master.target_system,
-                self.master.target_component,
-                b'WPNAV_SPEED', 
-                speed*100, # Speed in m/s is converted to cm/s
-                mavutil.mavlink.MAV_PARAM_TYPE_REAL32)
-    
-
-    def set_position_global(self,
-                            coordinate_frame=mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                            type_mask=0x07FF,
-                            lat=0,
-                            lon=0,
-                            alt=0,
-                            vx=0,
-                            vy=0,
-                            vz=0,
-                            afx=0,
-                            afy=0,
-                            afz=0,
-                            yaw=0,
-                            yaw_rate=0):
+        Args:
+            radius: Desired radius around target location.
+            lat: Latitude of target.
+            lon: Longitude of target.
+            alt: Relative altitude at target.
         """
-            Set position in global coordinates. Can also set velocity/acceleration setpoints
-            lat, lon, and altitude. Altitude depends on the coordinate frame chosen
-        """    
-        
-
-        self.master.mav.set_position_target_global_int_send(0,
-                                                        self.master.target_system,
-                                                        self.master.target_component,
-                                                        coordinate_frame,
-                                                        type_mask,
-                                                        int(lat * 10000000),
-                                                        int(lon * 10000000),
-                                                        alt,
-                                                        vx,
-                                                        vy,
-                                                        vz,
-                                                        afx,
-                                                        afy,
-                                                        afz,
-                                                        yaw,
-                                                        yaw_rate)
-
-
-    def do_reposition(self,
-               radius,
-               lat,
-               lon,
-               alt):
-        """
-        Similar to set_position_global but is intended for use with plane frame types. 
-        Alt is set to be relative altitude (ground is 0m)
-        """
-
         self.master.mav.command_int_send(
-                self.master.target_system,
-                self.master.target_component,
-                mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                mavutil.mavlink.MAV_CMD_DO_REPOSITION,
-                0,
-                1,
-                -1,
-                0,
-                radius,
-                0,
-                int(lat * 1e7),
-                int(lon * 1e7),
-                alt)
+            self.master.target_system,
+            self.master.target_component,
+            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+            mavutil.mavlink.MAV_CMD_DO_REPOSITION,
+            0,
+            1, -1, 0,
+            radius, 0,
+            int(lat * 1e7),
+            int(lon * 1e7),
+            alt
+        )
+        LOGGER.info("Reposition command: lat=%.7f lon=%.7f alt=%.2f radius=%.2f",
+                    lat, lon, alt, radius)
 
-                            
-    def transition_mc(self): 
-        # A method to transition from fixed wing to multi-copter
-        # Normal Transition is default, force immediate is not recommended as it can cause damage to the vehicle 
-
-        self.master.mav.command_long_send(
-                self.master.target_system,
-                self.master.target_component,
-                mavutil.mavlink.MAV_CMD_DO_VTOL_TRANSITION,
-                0,
-                mavutil.mavlink.MAV_VTOL_STATE_MC,
-                0, # Normal Transition and not a force immediate 
-                0,
-                0,
-                0,
-                0,
-                0)
-
-
-                    
-    def transition_fw(self): 
-        # A method to transition from multi-copter to forward flight
-        # Normal Transition is default, force immediate is not recommended as it can cause damage to the vehicle 
-
-        self.master.mav.command_long_send(
-                self.master.target_system,
-                self.master.target_component,
-                mavutil.mavlink.MAV_CMD_DO_VTOL_TRANSITION,
-                0,
-                mavutil.mavlink.MAV_VTOL_STATE_MC,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0)
-
-
-    def wait_target_reached(self, target, tolerance=0.05, timeout = 30) -> bool:
+    # ----------------------
+    # Speed control
+    # ----------------------
+    def set_speed(self, speed: float) -> None:
         """
-        Waits for the drone to reach specified target
-        """
+        Sets the global speed parameter (simulation/WIP).
 
-        current_pos = self.get_local_position() 
-        
-        check_target = util.check_target_reached(current_pos, target, tolerance)
-        start_time = time.time()
-        while not check_target:
-            current_pos = self.get_local_position()
-            check_target = util.check_target_reached(current_pos, target, tolerance)
-            if time.time() - start_time > timeout:
-                print("MAVCTL Timeout: Failed to reach target within tolerance. Continuing execution")
-                return False
-            
-        return True
-
-    def wait_target_reached_global(self, target, timeout = 30):
+        Args:
+            speed: Desired speed in m/s (converted to cm/s for MAVLink).
         """
-        Waits for the drone to reach specified target (in global coordinates)
-        """
-        current_pos = self.get_global_position()
-        distance = util.LatLon_to_Distance(current_pos, target)
-        start_time = time.time()
+        self.master.mav.param_set_send(
+            self.master.target_system,
+            self.master.target_component,
+            b'WPNAV_SPEED',
+            speed * 100,  # Convert m/s -> cm/s
+            mavutil.mavlink.MAV_PARAM_TYPE_REAL32
+        )
+        LOGGER.info("Global speed set to %.2f m/s", speed)
 
-        while not distance < 5:
-            current_pos = self.get_global_position()
-            distance = util.LatLon_to_Distance(current_pos, target)
-            if time.time() - start_time > timeout:
-                print("MAVCTL Timeout: Failed to reach target within tolerance. Continuing execution")
-                return False
-        
-        return True
+    def generate_typemask(self, keeps: Iterable[int]) -> int:
+        """
+        Generate a MAVLink type mask based on the bits to keep (enable).
+
+        Each bit position in `keeps` will be set to 1 in the resulting mask.
+
+        Args:
+            keeps (Iterable[int]): Bit positions to enable in the mask.
+
+        Returns:
+            int: Generated type mask.
+        """
+        mask = 0
+
+        for bit in keeps:
+            if bit < 0:
+                raise ValueError(f"Bit positions must be non-negative, got {bit}")
+            mask |= 1 << bit
+
+        return mask
