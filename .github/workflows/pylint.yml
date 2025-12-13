@@ -28,4 +28,4 @@ jobs:
 
       - name: Run pylint
         run: |
-          pylint your_package_or_files/
+          pylint $(git ls-files "*.py')
