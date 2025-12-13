@@ -105,8 +105,8 @@ class HeartbeatManager:
                     base_mode=0,
                     custom_mode=0,
                     system_status=mavutil.mavlink.MAV_STATE_ACTIVE
-                ) 
-            time.sleep(self.heartbeat_timeout) 
+                )
+            time.sleep(self.heartbeat_timeout)
 
     def get_connection_status(self) -> bool:
         """Get the current connection status."""

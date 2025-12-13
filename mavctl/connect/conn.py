@@ -1,89 +1,94 @@
+import time
+from typing import Optional
 
 from pymavlink import mavutil
-import time
-import threading
-from pymavlink import mavutil
+
 from mavctl.connect.heartbeat import HeartbeatManager
+from mavctl.exceptions import ConnError
+from mavctl._internal.logger import get_logger
+
+LOGGER = get_logger(__name__)
 
 class Connect:
-        
-    def __init__(self,                  
+    """Handles MAVLink connections and heartbeat monitors"""
+
+    def __init__(self,
                  ip: str = "udp:127.0.0.1:14552",
                  baud: int = 57600,
-                 heartbeat_timeout = None):
+                 heartbeat_timeout: Optional[int] = None):
 
+        """
+        Initialize a MAVLink connection and run the heartbeat manager on the connection
+
+        Args:
+            ip: Connection String
+            baud: Baud rate
+            heartbeat_timeout: Optional timeout in seconds for waiting for heartbeats
+        """
         self.master = self.connect(ip = ip, baud = baud, heartbeat_timeout = heartbeat_timeout)
-        
         self._heartbeat_manager = HeartbeatManager(self.master)
         self._heartbeat_manager.start()
-        
 
-    def send_heartbeat(self, interval: int = 0.25):
+        self.ip = ip
 
+    def connect(self, ip: str = "udp:127.0.0.1:14552",
+                baud: int = 57600,
+                heartbeat_timeout: Optional[int] = None) -> mavutil.mavlink_connection:
+        """
+        Function to connect to the MAVLink device
+
+        Args:
+            ip: Connection String
+            baud: Baud rate
+            heartbeat_timeout: Optional timeout in seconds for waiting for heartbeats
+
+        Returns:
+            A mavutil.mavlink_connection instance
+
+        Raises:
+            ConnError: If heartbeat or the connection fails
+        """
         try:
-            while True:
-                self.master.mav.heartbeat_send(
-                    type=mavutil.mavlink.MAV_TYPE_GCS,
-                    autopilot=mavutil.mavlink.MAV_AUTOPILOT_INVALID,
-                    base_mode=0,
-                    custom_mode=0,
-                    system_status=mavutil.mavlink.MAV_STATE_ACTIVE
-                ) 
-                time.sleep(interval)
-
-        except Exception as e:
-            raise Exception("MAVCTL ERROR: Failed to send heartbeat!: ", e)
-        
-    def recv_heartbeat(self, interval: int = 1):
-
-        try:
-            while True:
-                msg_recv = self.master.recv_match(type="HEARTBEAT", blocking=False)
-
-                # Create disconnect handling here... 
-                time.sleep(interval)
-
-        except Exception as e:
-            raise Exception("MAVCTL ERROR: Failed to send heartbeat!: ", e)
- 
-    def heartbeat_start(self):
-            self.send_heartbeat_thread.start()
-            self.recv_heartbeat_thread.start()
-
-    def heartbeat_kill(self):
-            self._stop_event.set()
-            self.send_heartbeat_thread.join(timeout=2)
-            self.recv_heartbeat_thread.join(timeout=2)
-    
-    def disconnect(self):
-        self.heartbeat_kill()
-        self.master.close()
-        print("MAVCTL: Disconnecting!")
-
-    # Function to connect to mavlink 
-    def connect(self, ip: str = "udp:127.0.0.1:14552", # Default IP and port for the UAARG Autopilot Simulator
-                baud: int = 57600,             # Default Baud Rate for the PixHawk, Add support for this later
-                #source_system = 255,       # Add support for this later 
-                #source_component = 0,      # Add support for this later    
-                heartbeat_timeout = None    # Automatically assume that there is no timeout 
-                ):
-        try:
-            # NOTE: Using default parameters built into pymavlink, look into how this can be customized
             master = mavutil.mavlink_connection(ip, baud)
             msg_recv = master.recv_match(type="HEARTBEAT", blocking=False)
             while not msg_recv:
                 i = 0
-                if heartbeat_timeout != None:
-                    if heartbeat_timeout > 0: 
+                if heartbeat_timeout is not None:
+                    if heartbeat_timeout > 0:
                         i += 1
                         if heartbeat_timeout % 5:
                             print("MAVCTL: Waiting for heartbeat ...")
                     elif heartbeat_timeout == 0:
-                        raise Exception("MAVCTL ERROR: Heartbeat not found!")
+                        raise ConnError("MAVCTL ERROR: Heartbeat not found!")
                 print("MAVCTL: Waiting for heartbeat ...")
                 msg_recv = master.recv_match(type="HEARTBEAT", blocking=False)
                 time.sleep(1)
-            print("MAVCTL: Connected at: ", ip)
+            LOGGER.info("MAVCTL: Connected at %s", ip)
             return master
+
         except Exception as e:
-            raise Exception("MAVCTL ERROR: Failed to receive heartbeat!: ", e)
+            raise ConnError("MAVCTL ERROR: Failed to receive heartbeat!: ", e) from e
+
+    def disconnect(self, timeout: float = 5, device: Optional[str] = None) -> bool:
+        """Graceful Disconnect from the MAVLink Device
+
+        Returns:
+            Bool saying whether or not the disconnect was successful
+
+        Raises ConnErorr if disconnect fails"""
+
+        LOGGER.info("MAVCTL: Disconnecting ...")
+        try:
+
+            self._heartbeat_manager.stop()
+            start_time = time.monotonic()
+            while self._heartbeat_manager.get_connection_status():
+                if (time.monotonic() - start_time) > timeout:
+                    LOGGER.warning("MAVCTL: Heartbeat manager did not stop within timeout")
+                    return False
+            self.master.close()
+            LOGGER.info("MAVCTL: Successfully Disconnected from %s", device)
+            return True
+
+        except Exception as e:
+            raise ConnError("MAVCTL ERROR: Disconnect failed", e) from e
