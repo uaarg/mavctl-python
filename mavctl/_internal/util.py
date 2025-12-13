@@ -10,9 +10,9 @@ def distance_to_target(target1, target2) -> LocationLocal:
         target1: Current Position of Vehicle (LocationLocal)
         target2: Target Position (LocationLocal)
     """
-    dx = target2.north - target1.north
-    dy = target2.east - target1.east
-    dz = target2.down - target1.down
+    dx = target2.x - target1.north
+    dy = target2.y - target1.east
+    dz = target2.z - target1.down
 
     return LocationLocal(dx, dy, dz)
 

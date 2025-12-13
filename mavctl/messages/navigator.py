@@ -1,7 +1,7 @@
 import time
 from math import atan
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Iterable
 
 from pymavlink import mavutil
 
@@ -132,6 +132,24 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
                 LOGGER.info("Mode set to %s", mode)
                 return True
 
+    def wait_for_mode_and_arm(self, mode="GUIDED", timeout=None) -> bool:
+        """Wait for the vehicle to enter ``mode`` and to be armed"""
+        mode_ready = self.set_mode_wait(mode=mode, timeout=timeout)
+        if not mode_ready:
+            return False
+        while not self.wait_vehicle_armed():
+            return True
+        LOGGER.warning("MAVCTL: Failed to wait for vehicle arm")
+        return False
+
+    def wait_vehicle_armed(self):
+        """
+        Waits for the vehicle to be armed. See samples directory for examples
+        """
+        LOGGER.info("MAVCTL: Waiting for vehicle to arm")
+        self.master.motors_armed_wait()
+        LOGGER.info("MAVCTL: Armed!")
+
     # ----------------------
     # Position / Velocity access
     # ----------------------
@@ -259,7 +277,7 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
 
     def simple_goto_global(self, lat: float, lon: float, alt: float) -> None:
         """Move drone to global coordinates."""
-        type_mask = self.master.generate_typemask([0, 1, 2, 9])
+        type_mask = self.generate_typemask([0, 1, 2, 9])
         start_point = self.get_global_position()
         yaw = util.Heading(start_point, LocationGlobal(lat, lon, alt))
         setpoint = PositionSetpointGlobal(lat=lat, lon=lon, alt=alt, yaw=yaw)
@@ -353,3 +371,24 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
             mavutil.mavlink.MAV_PARAM_TYPE_REAL32
         )
         LOGGER.info("Global speed set to %.2f m/s", speed)
+
+    def generate_typemask(self, keeps: Iterable[int]) -> int:
+        """
+        Generate a MAVLink type mask based on the bits to keep (enable).
+
+        Each bit position in `keeps` will be set to 1 in the resulting mask.
+
+        Args:
+            keeps (Iterable[int]): Bit positions to enable in the mask.
+
+        Returns:
+            int: Generated type mask.
+        """
+        mask = 0
+
+        for bit in keeps:
+            if bit < 0:
+                raise ValueError(f"Bit positions must be non-negative, got {bit}")
+            mask |= 1 << bit
+
+        return mask

@@ -26,4 +26,4 @@ jobs:
 
       - name: Run pylint
         run: |
-          pylint --rcfile=.pylintrc mavctl
+          pylint --rcfile=.pylintrc $(find mavctl -name "*.py")
