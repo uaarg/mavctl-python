@@ -1,1 +1,3 @@
 pymavlink==2.4.49
+pylint
+mypy-extensions
