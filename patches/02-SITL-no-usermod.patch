@@ -1,0 +1,15 @@
+diff --git a/Tools/environment_install/install-prereqs-ubuntu.sh b/Tools/environment_install/install-prereqs-ubuntu.sh
+index cccae745d2..beb03e4694 100755
+--- a/Tools/environment_install/install-prereqs-ubuntu.sh
++++ b/Tools/environment_install/install-prereqs-ubuntu.sh
+@@ -284,10 +284,6 @@ function maybe_prompt_user() {
+     fi
+ }
+ 
+-heading "Add user to dialout group to allow managing serial ports"
+-usermod -a -G dialout $USER
+-echo "Done!"
+-
+ # Add back python symlink to python interpreter on Ubuntu >= 20.04
+ if [ ${RELEASE_CODENAME} == 'focal' ];
+ then

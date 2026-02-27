@@ -1,0 +1,36 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies
+RUN apt update && apt install -y \
+    git \
+    python3 \
+    python3-pip \
+    python3-dev \
+    build-essential \
+    ccache \
+    g++ \
+    make \
+    wget \
+    netcat \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone ArduPilot
+WORKDIR /opt
+RUN git clone https://github.com/ArduPilot/ardupilot.git
+WORKDIR /opt/ardupilot
+
+RUN git submodule update --init --recursive
+
+# Install ArduPilot prerequisites
+RUN Tools/environment_install/install-prereqs-ubuntu.sh -y
+
+# Configure + build SITL
+RUN ./waf configure --board sitl
+RUN ./waf copter
+
+# Install pytest + mav tools
+RUN pip3 install pytest pymavlink mavctl
+
+WORKDIR /workspace

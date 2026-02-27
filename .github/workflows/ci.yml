@@ -1,0 +1,27 @@
+name: SITL Docker Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  sitl-test:
+    runs-on: ubuntu-latest
+
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Pull SITL image
+        run: |
+          echo "${{ secrets.CR_PAT}}" | \
+            docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker pull ghcr.io/${{ github.repository_owner }}/sitl:latest
+
+      - name: Run tests
+        run: |
+          docker run --rm \
+            -v $PWD:/workspace \
+            ghcr.io/uaarg/sitl:latest \
+            bash /workspace/scripts/dockertest.sh
