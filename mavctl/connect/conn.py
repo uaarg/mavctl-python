@@ -13,7 +13,7 @@ class Connect:
     """Handles MAVLink connections and heartbeat monitors"""
 
     def __init__(self,
-                 ip: str = "udp:127.0.0.1:14552",
+                 ip: str = "udp:127.0.0.1:14551",
                  baud: int = 57600,
                  heartbeat_timeout: Optional[int] = None):
 
@@ -31,7 +31,7 @@ class Connect:
 
         self.ip = ip
 
-    def connect(self, ip: str = "udp:127.0.0.1:14552",
+    def connect(self, ip: str = "udp:127.0.0.1:14551",
                 baud: int = 57600,
                 heartbeat_timeout: Optional[int] = None) -> mavutil.mavlink_connection:
         """
@@ -49,7 +49,7 @@ class Connect:
             ConnError: If heartbeat or the connection fails
         """
         try:
-            master = mavutil.mavlink_connection(ip, baud)
+            master = mavutil.mavlink_connection(device=ip, baud=baud)
             msg_recv = master.recv_match(type="HEARTBEAT", blocking=False)
             while not msg_recv:
                 i = 0

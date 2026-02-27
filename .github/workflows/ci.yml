@@ -1,0 +1,25 @@
+name: SITL Test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  sitl-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Pull SITL Docker image
+        run: |
+          docker pull ghcr.io/uaarg/sitl:latest
+
+      - name: Run tests
+        run: |
+          docker run --rm \
+            -v $PWD:/workspace \
+            ghcr.io/uaarg/sitl:latest \
+            bash /workspace/scripts/dockertest.sh
