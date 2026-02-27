@@ -35,7 +35,7 @@ echo "SITL process detected"
 
 echo "SITL ready"
 
-sleep 10
+sleep 30
 
 cd /workspace
 # Run tests

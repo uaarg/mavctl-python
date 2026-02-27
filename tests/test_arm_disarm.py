@@ -13,9 +13,6 @@ def drone():
     """
     nav = Navigator(ip=CONN_STR)
 
-    # Give SITL time to be ready
-    time.sleep(15)
-
     yield nav
 
 
