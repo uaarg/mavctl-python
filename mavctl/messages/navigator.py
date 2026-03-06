@@ -372,6 +372,21 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
         )
         LOGGER.info("Global speed set to %.2f m/s", speed)
 
+    def set_servo(self, servo_number, pwm_value):
+        """
+        servo_number: Output channel (1-16)
+        pwm_value:    PWM in microseconds (typically 1000-2000, center=1500)
+        """
+        self.master.mav.command_long_send(
+            self.master.target_system,
+            self.master.target_component,
+            mavutil.mavlink.MAV_CMD_DO_SET_SERVO,
+            0,           # confirmation
+            servo_number,  # param1: servo instance (output channel)
+            pwm_value,     # param2: PWM value (microseconds)
+            0, 0, 0, 0, 0  # params 3-7 unused
+        )
+
     def generate_typemask(self, keeps: Iterable[int]) -> int:
         """
         Generate a MAVLink type mask based on the bits to keep (enable).
