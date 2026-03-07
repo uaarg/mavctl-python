@@ -1,5 +1,5 @@
 import time
-from math import atan
+from math import atan, pi
 from dataclasses import dataclass
 from typing import Optional, Iterable
 
@@ -167,6 +167,14 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
             return LocationLocal(msg.x, msg.y, msg.z)
         return LocationLocal(0, 0, 0)
 
+    def get_local_position_ned(self) -> tuple[float, float, float]:
+        """
+        Convenience helper returning the current local NED position as a tuple
+        (north, east, down), mirroring older Navigator APIs.
+        """
+        pos = self.get_local_position()
+        return (pos.north, pos.east, pos.down)
+
     def get_velocity(self) -> Velocity:
         """Returns the current local velocity in NED."""
         msg = self.master.recv_match(type="LOCAL_POSITION_NED", blocking=True)
@@ -210,6 +218,23 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
             setpoint.yaw, setpoint.yaw_rate
         )
         LOGGER.debug("Local setpoint sent: %s", setpoint)
+
+    def set_position_target_local_ned(
+        self,
+        x: float = 0,
+        y: float = 0,
+        z: float = 0,
+        coordinate_frame: int = mavutil.mavlink.MAV_FRAME_LOCAL_NED,
+        type_mask: int = 0x07FF,
+    ) -> None:
+        """
+        Convenience wrapper mirroring older set_position_target_local_ned APIs.
+
+        Uses position-only setpoints; velocity/acceleration/yaw fields are left
+        at their defaults.
+        """
+        setpoint = PositionSetpointLocal(x=x, y=y, z=z)
+        self.set_position_local_ned(setpoint, coordinate_frame=coordinate_frame, type_mask=type_mask)
 
     def set_position_global(self, setpoint: PositionSetpointGlobal,
                             coordinate_frame: int = mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
@@ -371,6 +396,82 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
             mavutil.mavlink.MAV_PARAM_TYPE_REAL32
         )
         LOGGER.info("Global speed set to %.2f m/s", speed)
+
+    # ----------------------
+    # Heading / relative helpers
+    # ----------------------
+    def set_heading(self, heading: float, yaw_rate: float = 0) -> None:
+        """
+        Set absolute heading using MAV_CMD_CONDITION_YAW.
+
+        Args:
+            heading: Target yaw in degrees.
+            yaw_rate: Desired yaw rate in deg/s (0 to use default).
+        """
+        self.master.mav.command_long_send(
+            self.master.target_system,
+            self.master.target_component,
+            mavutil.mavlink.MAV_CMD_CONDITION_YAW,
+            0,
+            heading,
+            yaw_rate,
+            1,  # direction: 1=cw, -1=ccw
+            0,  # absolute angle
+            0,
+            0,
+            0,
+        )
+        LOGGER.info("Set heading to %.2f degrees", heading)
+
+    def set_heading_relative(self, delta_heading: float, yaw_rate: float = 0) -> None:
+        """
+        Adjust heading relative to current using MAV_CMD_CONDITION_YAW.
+
+        Args:
+            delta_heading: Relative yaw change in degrees (positive cw).
+            yaw_rate: Desired yaw rate in deg/s (0 to use default).
+        """
+        self.master.mav.command_long_send(
+            self.master.target_system,
+            self.master.target_component,
+            mavutil.mavlink.MAV_CMD_CONDITION_YAW,
+            0,
+            delta_heading,
+            yaw_rate,
+            1,
+            1,  # relative angle
+            0,
+            0,
+            0,
+        )
+        LOGGER.info("Adjusted heading by %.2f degrees", delta_heading)
+
+    def set_position_relative(self, d_north: float, d_east: float, d_alt: float = 0.0) -> None:
+        """
+        Move the vehicle by a relative offset in metres using global coordinates.
+
+        Args:
+            d_north: Distance to move north in metres.
+            d_east: Distance to move east in metres.
+            d_alt: Change in altitude in metres (positive up).
+        """
+        current = self.get_global_position()
+        if current.alt is None:
+            current_alt = 0.0
+        else:
+            current_alt = current.alt
+
+        # Spherical Earth approximation (same as older Navigator)
+        earth_radius = 6378137.0
+        d_lat = d_north / earth_radius
+        d_lon = d_east / (earth_radius * cos(pi * current.lat / 180.0))
+
+        new_lat = current.lat + (d_lat * 180.0 / pi)
+        new_lon = current.lon + (d_lon * 180.0 / pi)
+        new_alt = current_alt + d_alt
+
+        target = PositionSetpointGlobal(lat=new_lat, lon=new_lon, alt=new_alt)
+        self.set_position_global(target)
 
     def set_servo(self, servo_number, pwm_value):
         """
