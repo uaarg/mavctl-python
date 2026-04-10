@@ -46,6 +46,19 @@ class PositionSetpointGlobal:
     yaw_rate: float = 0
 
 
+@dataclass
+class LandingTarget:
+    """
+    Data class to store position of landing target in MAV_FRAME_BODY_FRD frame.
+    FRD local frame aligned to the vehicle's attitude (x: Forward, y: Right, z: Down)
+    with an origin that travels with vehicle.
+    """
+    forward: float
+    right: float
+    altitude: float
+
+
+
 # ----------------------
 # Navigator Class
 # ----------------------
@@ -508,3 +521,28 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
             mask |= 1 << bit
 
         return mask
+
+    def broadcast_landing_target(self, landing_target: LandingTarget) -> None: 
+        """
+        This function broadcasts the position of the landing target in MAV_FRAME_BODY_FRD frame.
+        """
+
+        time_usec = int(time.time() * 1000000) # convert to microseconds
+            
+        print(landing_target)
+        self.master.mav.landing_target_send(time_usec=time_usec,
+                        target_num=0,
+                        frame=mavutil.mavlink.MAV_FRAME_BODY_FRD,
+                        angle_x=landing_target.forward,
+                        angle_y=landing_target.right,
+                        distance=landing_target.altitude,
+                        size_x=0.0,
+                        size_y=0.0,
+                        x=0.0,
+                        y=0.0,
+                        z=0.0,
+                        q=[0,0,0,0],
+                        type=0,
+                        position_valid=0
+)
+
