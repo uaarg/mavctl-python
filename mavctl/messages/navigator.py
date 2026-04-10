@@ -535,14 +535,14 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
                         frame=mavutil.mavlink.MAV_FRAME_BODY_FRD,
                         angle_x=landing_target.forward,
                         angle_y=landing_target.right,
-                        distance=landing_target.altitude,
+                        distance=0, # Apparently this works according to aero clubs precisiton landing testing (??)
                         size_x=0.0,
                         size_y=0.0,
                         x=0.0,
                         y=0.0,
                         z=0.0,
                         q=[0,0,0,0],
-                        type=0,
+                        type=2, # Fiducial marker (for testing purposes)
                         position_valid=0
 )
 
