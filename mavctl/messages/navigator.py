@@ -79,6 +79,21 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
         self.master = Connect(ip=ip, baud=baud, heartbeat_timeout=heartbeat_timeout).master
         LOGGER.info("Navigator connected to %s", ip)
 
+    def set_message_interval(self, messageID = 32, interval = 5000) -> None:
+        self.master.mav.command_long_send(
+                self.master.target_system,
+                self.master.target_component,
+                mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
+                0,
+                messageID,
+                interval,
+                0,
+                0,
+                0,
+                0,
+                0
+                )
+
     # ----------------------
     # Arm / Disarm
     # ----------------------
@@ -533,16 +548,16 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
         self.master.mav.landing_target_send(time_usec=time_usec,
                         target_num=0,
                         frame=mavutil.mavlink.MAV_FRAME_BODY_FRD,
-                        angle_x=landing_target.forward,
-                        angle_y=landing_target.right,
-                        distance=0, # Apparently this works according to aero clubs precisiton landing testing (??)
+                        angle_x=0,
+                        angle_y=0,
+                        distance=-landing_target.altitude, # Apparently this works according to aero clubs precisiton landing testing (??)
                         size_x=0.0,
                         size_y=0.0,
-                        x=0.0,
-                        y=0.0,
-                        z=0.0,
-                        q=[0,0,0,0],
-                        type=2, # Fiducial marker (for testing purposes)
-                        position_valid=0
+                        x=landing_target.forward,
+                        y=landing_target.right,
+                        z=-landing_target.altitude,
+                        q=[1,0,0,0],
+                        type=0, # Fiducial marker (for testing purposes)
+                        position_valid=1
 )
 
