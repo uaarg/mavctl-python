@@ -33,7 +33,7 @@ class Connect:
 
     def connect(self, ip: str = "udp:127.0.0.1:14551",
                 baud: int = 57600,
-                heartbeat_timeout: Optional[int] = None) -> mavutil.mavlink_connection:
+                heartbeat_timeout: Optional[int] = None) -> mavutil.mavfile:
         """
         Function to connect to the MAVLink device
 
@@ -68,6 +68,9 @@ class Connect:
 
         except Exception as e:
             raise ConnError("MAVCTL ERROR: Failed to receive heartbeat!: ", e) from e
+
+    def is_connected(self) -> bool:
+        return self._heartbeat_manager.get_connection_status()
 
     def disconnect(self, timeout: float = 5, device: Optional[str] = None) -> bool:
         """Graceful Disconnect from the MAVLink Device

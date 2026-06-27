@@ -63,8 +63,12 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
             baud: Serial baud rate (ignored for UDP).
             heartbeat_timeout: Optional heartbeat timeout.
         """
-        self.master = Connect(ip=ip, baud=baud, heartbeat_timeout=heartbeat_timeout).master
+        self.connect = Connect(ip=ip, baud=baud, heartbeat_timeout=heartbeat_timeout)
+        self.master = self.connect.master
         LOGGER.info("Navigator connected to %s", ip)
+
+    def is_connected(self) -> bool:
+        return self.connect.is_connected()
 
     # ----------------------
     # Arm / Disarm
