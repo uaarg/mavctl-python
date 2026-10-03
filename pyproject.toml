@@ -1,8 +1,12 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "mavctl-python"
 version = "0.1.0"
-description = "mavctl-python submodule"
 requires-python = ">=3.9"
+dependencies = ["pymavlink>=2.4.41"]
 
 [tool.setuptools.packages.find]
-where = ["."]
+include = ["mavctl"]
