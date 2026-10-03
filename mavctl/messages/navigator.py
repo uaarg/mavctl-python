@@ -45,6 +45,10 @@ class PositionSetpointGlobal:
     yaw: float = 0
     yaw_rate: float = 0
 
+MASK_POS_ONLY = 0x0DF8
+MASK_POS_YAW = 0x09F8
+MASK_VEL_ONLY = 0x0DC7
+
 
 @dataclass
 class ADSBVehicle:
@@ -322,10 +326,10 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
     # ----------------------
     def simple_goto_local(self, x: float, y: float, z: float) -> None:
         """Move drone to local NED coordinates."""
-        type_mask = self.master.generate_typemask([0, 1, 2, 9])
+        type_mask = self.generate_typemask([0, 1, 2, 9])
         yaw_angle = atan(y / x) if x != 0 else 0
         setpoint = PositionSetpointLocal(x=x, y=y, z=-z, yaw=yaw_angle)
-        self.set_position_local_ned(setpoint, type_mask=type_mask)
+        self.set_position_local_ned(setpoint, type_mask=MASK_POS_YAW)
         self.wait_target_reached(setpoint)
 
     def simple_goto_global(self, lat: float, lon: float, alt: float) -> None:
@@ -334,7 +338,7 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
         start_point = self.get_global_position()
         yaw = util.Heading(start_point, LocationGlobal(lat, lon, alt))
         setpoint = PositionSetpointGlobal(lat=lat, lon=lon, alt=alt, yaw=yaw)
-        self.set_position_global(setpoint, type_mask=type_mask)
+        self.set_position_global(setpoint, type_mask=MASK_POS_YAW)
         self.wait_target_reached_global(setpoint)
 
     # ----------------------
@@ -593,21 +597,21 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
             vehicle.altitude, vehicle.heading
         )
 
-    def generate_typemask(self, keeps: Iterable[int]) -> int:
+    def generate_typemask(self, ignores: Iterable[int]) -> int:
         """
-        Generate a MAVLink type mask based on the bits to keep (enable).
+        Generate a MAVLink type mask based on the bits to ignore (disable).
 
-        Each bit position in `keeps` will be set to 1 in the resulting mask.
+        Each bit position in `ignores` will be set to 1 in the resulting mask.
 
         Args:
-            keeps (Iterable[int]): Bit positions to enable in the mask.
+            ignores (Iterable[int]): Bit positions to disable in the mask.
 
         Returns:
             int: Generated type mask.
         """
         mask = 0
 
-        for bit in keeps:
+        for bit in ignores:
             if bit < 0:
                 raise ValueError(f"Bit positions must be non-negative, got {bit}")
             mask |= 1 << bit
