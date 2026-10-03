@@ -62,7 +62,7 @@ class ADSBVehicle:
     ver_velocity: float = 0  # m/s, positive up
     callsign: str = ""
     squawk: int = 0
-    altitude_type: int = mavutil.mavlink.ADSB_ALTITUDE_TYPE_GEOMETRIC
+    altitude_type: int = mavutil.mavlink.ADSB_ALTITUDE_TYPE_PRESSURE_QNH
     emitter_type: int = mavutil.mavlink.ADSB_EMITTER_TYPE_UAV
     tslc: int = 0
 
@@ -74,7 +74,7 @@ class ADSBAvoidanceConfig:
     fail_dist_xy: float = 500   # metres, horizontal near-miss distance ("radius")
     fail_dist_z: float = 500    # metres, vertical near-miss distance
     fail_time: float = 0        # seconds of advance warning before reacting
-    fail_action: int = 2        # 2=Climb/Descend,3=Move Horiz,4=Move Perp 3D,5=RTL,6=Hover
+    fail_action: int = 5        # 2=Climb/Descend,3=Move Horiz,4=Move Perp 3D,5=RTL,6=Hover
     fail_recovery: int = 1      # 1=Resume previous flight mode
 
 
@@ -339,7 +339,7 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
         yaw = util.Heading(start_point, LocationGlobal(lat, lon, alt))
         setpoint = PositionSetpointGlobal(lat=lat, lon=lon, alt=alt, yaw=yaw)
         self.set_position_global(setpoint, type_mask=MASK_POS_YAW)
-        self.wait_target_reached_global(setpoint)
+        #self.wait_target_reached_global(setpoint)
 
     # ----------------------
     # VTOL transitions
