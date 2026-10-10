@@ -1,4 +1,5 @@
 import time
+import threading # not implemented yet
 from math import atan, pi
 from dataclasses import dataclass
 from typing import Optional, Iterable
@@ -6,7 +7,7 @@ from typing import Optional, Iterable
 from pymavlink import mavutil
 
 from mavctl._internal import util
-from mavctl.messages.location import LocationGlobal, LocationLocal, Velocity
+from mavctl.messages.location import LocationGlobal, LocationLocal, Velocity, Battery
 from mavctl.connect.conn import Connect
 from mavctl._internal.logger import get_logger
 
@@ -51,6 +52,8 @@ class PositionSetpointGlobal:
 # ----------------------
 class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-attributes
     """Navigator class for MAVLink drones with logging and helper functions."""
+
+    uav_id: str = "null"   # UAV identifier sent in telemetry packets
 
     def __init__(self, ip: str = "udp:127.0.0.1:14551",
                  baud: int = 57600,
@@ -151,6 +154,27 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
         LOGGER.info("MAVCTL: Armed!")
 
     # ----------------------
+    # UAV identifier
+    # ----------------------
+    def get_uav_id(self) -> str:
+        """Returns the UAV identifier sent in telemetry packets."""
+        LOGGER.debug("UAV identifier: %s", self.uav_id)
+        return self.uav_id
+
+    # ----------------------
+    # Timestamp
+    # ----------------------
+    def get_timestamp(self) -> float:
+        """Returns the current unix time in seconds, from the autopilot's GPS clock if available."""
+        msg = self.master.recv_match(type="SYSTEM_TIME", blocking=True)
+        if msg and msg.time_unix_usec > 0:
+            timestamp = msg.time_unix_usec / 1000000  # microseconds -> seconds
+        else:
+            timestamp = time.time()
+        LOGGER.debug("Timestamp: %.3f", timestamp)
+        return timestamp
+
+    # ----------------------
     # Position / Velocity access
     # ----------------------
     def get_global_position(self) -> LocationGlobal:
@@ -181,6 +205,19 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
         if msg:
             return Velocity(msg.vx, msg.vy, msg.vz)
         return Velocity(0, 0, 0)
+
+    # ----------------------
+    # Altitude AGL
+    # ----------------------
+    def get_altitude_agl(self) -> float:
+        """Returns the altitude above the home (takeoff) point in metres."""
+        msg = self.master.recv_match(type="GLOBAL_POSITION_INT", blocking=True)
+        if msg:
+            altitude = msg.relative_alt / 1000  # millimetres -> metres
+        else:
+            altitude = 0.0
+        LOGGER.debug("Altitude AGL: %.2f m", altitude)
+        return altitude
 
     # ----------------------
     # Takeoff
@@ -508,3 +545,26 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
             mask |= 1 << bit
 
         return mask
+
+    # ----------------------
+    # Flight modes
+    # ----------------------
+    FLIGHT_MODE_OFF = "off"
+    FLIGHT_MODE_IDLE = "idle"
+    FLIGHT_MODE_LINK_LOST = "link-lost"
+    FLIGHT_MODE_FAILSAFE = "failsafe"
+    FLIGHT_MODE_ARMED_PILOT = "armed-pilot"
+    FLIGHT_MODE_ARMED_AUTOMATIC = "armed-automatic"
+
+    # ----------------------
+    # Battery
+    # ----------------------
+    def get_battery(self) -> Battery:
+        """Returns the current battery voltage, current and level."""
+        msg = self.master.recv_match(type="SYS_STATUS", blocking=True)
+        if msg:
+            battery = Battery(msg.voltage_battery, msg.current_battery, msg.battery_remaining)
+        else:
+            battery = Battery(0, -1, -1)
+        LOGGER.debug("Battery: %s", battery)
+        return battery
