@@ -45,6 +45,38 @@ class PositionSetpointGlobal:
     yaw: float = 0
     yaw_rate: float = 0
 
+MASK_POS_ONLY = 0x0DF8
+MASK_POS_YAW = 0x09F8
+MASK_VEL_ONLY = 0x0DC7
+
+
+@dataclass
+class ADSBVehicle:
+    """Describes a reported ADS-B traffic vehicle, in human-readable units."""
+    icao_address: int
+    lat: float = 0  # degrees
+    lon: float = 0  # degrees
+    altitude: float = 0  # metres (ASL)
+    heading: float = 0  # degrees, 0-359.99
+    hor_velocity: float = 0  # m/s
+    ver_velocity: float = 0  # m/s, positive up
+    callsign: str = ""
+    squawk: int = 0
+    altitude_type: int = mavutil.mavlink.ADSB_ALTITUDE_TYPE_PRESSURE_QNH
+    emitter_type: int = mavutil.mavlink.ADSB_EMITTER_TYPE_UAV
+    tslc: int = 0
+
+
+@dataclass
+class ADSBAvoidanceConfig:
+    """ArduPilot AVOID_ADSB (AVD_*) avoidance configuration."""
+    enable: bool = True
+    fail_dist_xy: float = 500   # metres, horizontal near-miss distance ("radius")
+    fail_dist_z: float = 500    # metres, vertical near-miss distance
+    fail_time: float = 0        # seconds of advance warning before reacting
+    fail_action: int = 4        # 2=Climb/Descend,3=Move Horiz,4=Move Perp 3D,5=RTL,6=Hover
+    fail_recovery: int = 1      # 1=Resume previous flight mode
+
 
 # ----------------------
 # Navigator Class
@@ -294,10 +326,10 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
     # ----------------------
     def simple_goto_local(self, x: float, y: float, z: float) -> None:
         """Move drone to local NED coordinates."""
-        type_mask = self.master.generate_typemask([0, 1, 2, 9])
+        type_mask = self.generate_typemask([0, 1, 2, 9])
         yaw_angle = atan(y / x) if x != 0 else 0
         setpoint = PositionSetpointLocal(x=x, y=y, z=-z, yaw=yaw_angle)
-        self.set_position_local_ned(setpoint, type_mask=type_mask)
+        self.set_position_local_ned(setpoint, type_mask=MASK_POS_YAW)
         self.wait_target_reached(setpoint)
 
     def simple_goto_global(self, lat: float, lon: float, alt: float) -> None:
@@ -306,8 +338,8 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
         start_point = self.get_global_position()
         yaw = util.Heading(start_point, LocationGlobal(lat, lon, alt))
         setpoint = PositionSetpointGlobal(lat=lat, lon=lon, alt=alt, yaw=yaw)
-        self.set_position_global(setpoint, type_mask=type_mask)
-        self.wait_target_reached_global(setpoint)
+        self.set_position_global(setpoint, type_mask=MASK_POS_YAW)
+        #self.wait_target_reached_global(setpoint)
 
     # ----------------------
     # VTOL transitions
@@ -396,6 +428,39 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
             mavutil.mavlink.MAV_PARAM_TYPE_REAL32
         )
         LOGGER.info("Global speed set to %.2f m/s", speed)
+
+    # ----------------------
+    # ADS-B avoidance (AVOID_ADSB)
+    # ----------------------
+    def set_adsb_avoidance_params(self, config: ADSBAvoidanceConfig) -> None:
+        """
+        Configure ArduPilot's ADS-B based avoidance (AVOID_ADSB mode).
+
+        There is no "radius" field on ADSB_VEHICLE itself -- ArduPilot
+        projects the reported vehicle's position/velocity forward and
+        compares it against these horizontal/vertical distance thresholds
+        to decide whether a near-miss is imminent.
+
+        Args:
+            config: ADSBAvoidanceConfig describing the desired AVD_* params.
+        """
+        params = {
+            "AVD_ENABLE": int(config.enable),
+            "AVD_F_DIST_XY": config.fail_dist_xy,
+            "AVD_F_DIST_Z": config.fail_dist_z,
+            "AVD_F_TIME": config.fail_time,
+            "AVD_F_ACTION": config.fail_action,
+            "AVD_F_RCVRY": config.fail_recovery,
+        }
+        for name, value in params.items():
+            self.master.mav.param_set_send(
+                self.master.target_system,
+                self.master.target_component,
+                name.encode("ascii"),
+                float(value),
+                mavutil.mavlink.MAV_PARAM_TYPE_REAL32
+            )
+            LOGGER.info("Set %s = %s", name, value)
 
     # ----------------------
     # Heading / relative helpers
@@ -488,21 +553,65 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
             0, 0, 0, 0, 0  # params 3-7 unused
         )
 
-    def generate_typemask(self, keeps: Iterable[int]) -> int:
+    # ----------------------
+    # ADSB
+    # ----------------------
+    def send_adsb_vehicle(self, vehicle: ADSBVehicle) -> None:
         """
-        Generate a MAVLink type mask based on the bits to keep (enable).
-
-        Each bit position in `keeps` will be set to 1 in the resulting mask.
+        Send an ADSB_VEHICLE message to report a nearby aircraft's position
+        to the autopilot (e.g. for ADS-B based collision avoidance).
 
         Args:
-            keeps (Iterable[int]): Bit positions to enable in the mask.
+            vehicle: ADSBVehicle describing the traffic to report.
+        """
+        flags = (
+            mavutil.mavlink.ADSB_FLAGS_VALID_COORDS
+            | mavutil.mavlink.ADSB_FLAGS_VALID_ALTITUDE
+            | mavutil.mavlink.ADSB_FLAGS_VALID_HEADING
+            | mavutil.mavlink.ADSB_FLAGS_VALID_VELOCITY
+            | mavutil.mavlink.ADSB_FLAGS_VERTICAL_VELOCITY_VALID
+        )
+        if vehicle.callsign:
+            flags |= mavutil.mavlink.ADSB_FLAGS_VALID_CALLSIGN
+        if vehicle.squawk:
+            flags |= mavutil.mavlink.ADSB_FLAGS_VALID_SQUAWK
+
+        self.master.mav.adsb_vehicle_send(
+            vehicle.icao_address,
+            int(vehicle.lat * 1e7),
+            int(vehicle.lon * 1e7),
+            vehicle.altitude_type,
+            int(vehicle.altitude * 1000),
+            int(vehicle.heading * 100) % 36000,
+            int(vehicle.hor_velocity * 100),
+            int(vehicle.ver_velocity * 100),
+            vehicle.callsign.encode("ascii"),
+            vehicle.emitter_type,
+            vehicle.tslc,
+            flags,
+            vehicle.squawk,
+        )
+        LOGGER.info(
+            "ADSB_VEHICLE sent: ICAO=%d lat=%.7f lon=%.7f alt=%.2f heading=%.1f",
+            vehicle.icao_address, vehicle.lat, vehicle.lon,
+            vehicle.altitude, vehicle.heading
+        )
+
+    def generate_typemask(self, ignores: Iterable[int]) -> int:
+        """
+        Generate a MAVLink type mask based on the bits to ignore (disable).
+
+        Each bit position in `ignores` will be set to 1 in the resulting mask.
+
+        Args:
+            ignores (Iterable[int]): Bit positions to disable in the mask.
 
         Returns:
             int: Generated type mask.
         """
         mask = 0
 
-        for bit in keeps:
+        for bit in ignores:
             if bit < 0:
                 raise ValueError(f"Bit positions must be non-negative, got {bit}")
             mask |= 1 << bit
