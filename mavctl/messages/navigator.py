@@ -74,7 +74,7 @@ class ADSBAvoidanceConfig:
     fail_dist_xy: float = 500   # metres, horizontal near-miss distance ("radius")
     fail_dist_z: float = 500    # metres, vertical near-miss distance
     fail_time: float = 0        # seconds of advance warning before reacting
-    fail_action: int = 5        # 2=Climb/Descend,3=Move Horiz,4=Move Perp 3D,5=RTL,6=Hover
+    fail_action: int = 4        # 2=Climb/Descend,3=Move Horiz,4=Move Perp 3D,5=RTL,6=Hover
     fail_recovery: int = 1      # 1=Resume previous flight mode
 
 
