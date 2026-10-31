@@ -69,6 +69,10 @@ class Connect:
         except Exception as e:
             raise ConnError("MAVCTL ERROR: Failed to receive heartbeat!: ", e) from e
 
+    def get_heartbeat_manager(self) -> HeartbeatManager:
+        """Returns the heartbeat manager running on this connection."""
+        return self._heartbeat_manager
+
     def disconnect(self, timeout: float = 5, device: Optional[str] = None) -> bool:
         """Graceful Disconnect from the MAVLink Device
 

@@ -34,6 +34,12 @@ class HeartbeatManager:
         self.last_heartbeat = 0
         self.missed_heartbeats = 0
         self.is_connected = False
+
+        # Latest HEARTBEAT from the autopilot itself, and when it arrived
+        self.last_autopilot_heartbeat = None
+        self.last_autopilot_heartbeat_time = 0.0
+        self._autopilot_lock = threading.Lock()
+
         self._stop_event = threading.Event()
         self._monitor_thread = None
         self._send_thread = None
@@ -81,6 +87,14 @@ class HeartbeatManager:
 
             if msg is not None:
                 self.last_heartbeat = time.time()
+
+                # Save the autopilot's heartbeat so Navigator can read flight state
+                # without its own recv_match (which would race this thread)
+                if self._is_autopilot_heartbeat(msg):
+                    with self._autopilot_lock:
+                        self.last_autopilot_heartbeat = msg
+                        self.last_autopilot_heartbeat_time = time.time()
+
                 self.missed_heartbeats = 0
                 if not self.is_connected:
                     self.is_connected = True
@@ -96,6 +110,28 @@ class HeartbeatManager:
                     if callback is not None:
                         callback()
 
+    def _is_autopilot_heartbeat(self, msg) -> bool:
+        """True if this HEARTBEAT came from the vehicle's autopilot."""
+        # Heartbeats from other systems, e.g. Mission Planner (sysid 255)
+        if msg.get_srcSystem() != self.master.target_system:
+            return False
+
+        # Non-autopilot components on our system, e.g. Shepard or a camera
+        if msg.autopilot == mavutil.mavlink.MAV_AUTOPILOT_INVALID:
+            return False
+
+        return True
+
+    def get_last_autopilot_heartbeat(self):
+        """
+        Returns (message, receive_time) of the latest autopilot HEARTBEAT.
+        message is None if no autopilot heartbeat has arrived yet.
+        """
+        with self._autopilot_lock:
+            heartbeat = self.last_autopilot_heartbeat
+            received_at = self.last_autopilot_heartbeat_time
+        return heartbeat, received_at
+
     def _send_heartbeat(self):
         """Send heartbeat messages"""
         while not self._stop_event.is_set():
@@ -107,6 +143,28 @@ class HeartbeatManager:
                     system_status=mavutil.mavlink.MAV_STATE_ACTIVE
                 )
             time.sleep(self.heartbeat_timeout)
+
+    def _is_autopilot_heartbeat(self, msg) -> bool:
+        """True if this HEARTBEAT came from the vehicle's autopilot."""
+        # Heartbeats from other systems, e.g. Mission Planner (sysid 255)
+        if msg.get_srcSystem() != self.master.target_system:
+            return False
+
+        # Non-autopilot components on our system, e.g. Shepard or a camera
+        if msg.autopilot == mavutil.mavlink.MAV_AUTOPILOT_INVALID:
+            return False
+
+        return True
+
+    def get_last_autopilot_heartbeat(self):
+        """
+        Returns (message, receive_time) of the latest autopilot HEARTBEAT.
+        message is None if no autopilot heartbeat has arrived yet.
+        """
+        with self._autopilot_lock:
+            heartbeat = self.last_autopilot_heartbeat
+            received_at = self.last_autopilot_heartbeat_time
+        return heartbeat, received_at
 
     def get_connection_status(self) -> bool:
         """Get the current connection status."""
