@@ -1,4 +1,3 @@
-from pymavlink import mavutil
 from mavctl import Navigator
 import time
 
@@ -11,6 +10,6 @@ while not drone.wait_for_mode_and_arm():
 
 drone.takeoff(10)
 time.sleep(5)
-drone.simple_goto_global(53.496970, -113.545194, 20)
+drone.simple_goto_global(53.496970, -113.545194, 10)
 
 drone.return_to_launch()

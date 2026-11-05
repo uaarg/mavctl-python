@@ -62,7 +62,7 @@ class Connect:
                         raise ConnError("MAVCTL ERROR: Heartbeat not found!")
                 print("MAVCTL: Waiting for heartbeat ...")
                 msg_recv = master.recv_match(type="HEARTBEAT", blocking=False)
-                time.sleep(1)
+                time.sleep(0.25)
             LOGGER.info("MAVCTL: Connected at %s", ip)
             return master
 
