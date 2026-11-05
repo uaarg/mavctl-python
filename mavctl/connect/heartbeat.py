@@ -144,28 +144,6 @@ class HeartbeatManager:
                 )
             time.sleep(self.heartbeat_timeout)
 
-    def _is_autopilot_heartbeat(self, msg) -> bool:
-        """True if this HEARTBEAT came from the vehicle's autopilot."""
-        # Heartbeats from other systems, e.g. Mission Planner (sysid 255)
-        if msg.get_srcSystem() != self.master.target_system:
-            return False
-
-        # Non-autopilot components on our system, e.g. Shepard or a camera
-        if msg.autopilot == mavutil.mavlink.MAV_AUTOPILOT_INVALID:
-            return False
-
-        return True
-
-    def get_last_autopilot_heartbeat(self):
-        """
-        Returns (message, receive_time) of the latest autopilot HEARTBEAT.
-        message is None if no autopilot heartbeat has arrived yet.
-        """
-        with self._autopilot_lock:
-            heartbeat = self.last_autopilot_heartbeat
-            received_at = self.last_autopilot_heartbeat_time
-        return heartbeat, received_at
-
     def get_connection_status(self) -> bool:
         """Get the current connection status."""
         return self.is_connected

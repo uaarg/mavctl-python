@@ -1,13 +1,13 @@
 import time
-import threading
-from math import atan, pi
+from math import atan, pi, cos
 from dataclasses import dataclass
 from typing import Optional, Iterable
 
 from pymavlink import mavutil
 
 from mavctl._internal import util
-from mavctl.messages.location import LocationGlobal, LocationLocal, Velocity, Battery, PositionAccuracy
+from mavctl.messages.location import (LocationGlobal, LocationLocal,
+                                        Velocity, Battery, PositionAccuracy)
 from mavctl.connect.conn import Connect
 from mavctl._internal.logger import get_logger
 
@@ -320,7 +320,10 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
         at their defaults.
         """
         setpoint = PositionSetpointLocal(x=x, y=y, z=z)
-        self.set_position_local_ned(setpoint, coordinate_frame=coordinate_frame, type_mask=type_mask)
+        self.set_position_local_ned(
+            setpoint,
+            coordinate_frame=coordinate_frame,
+            type_mask=type_mask)
 
     def set_position_global(self, setpoint: PositionSetpointGlobal,
                             coordinate_frame: int = mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
@@ -616,8 +619,9 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
 
         NO 'LINK-LOST' YET
 
-        Arguemnts:
-            heartbeat_timeout: Seconds without an autopilot HEARTBEAT before the vehicle is reported as 'off'.
+        Arguments:
+            heartbeat_timeout: Seconds without an autopilot
+            HEARTBEAT before the vehicle is reported as 'off'.
         """
         # Read the heartbeat the HeartbeatManager thread already received.
         # Calling recv_match here would race that thread for heartbeats.
@@ -638,23 +642,24 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
         if armed_bit == 0:
             return self.FLIGHT_MODE_IDLE
 
-        if heartbeat.system_status == mavutil.mavlink.MAV_STATE_CRITICAL:
-            return self.FLIGHT_MODE_FAILSAFE
-        if heartbeat.system_status == mavutil.mavlink.MAV_STATE_EMERGENCY:
+        # CRITICAL or EMERGENCY system status both mean the autopilot is in failsafe
+        is_critical = heartbeat.system_status == mavutil.mavlink.MAV_STATE_CRITICAL
+        is_emergency = heartbeat.system_status == mavutil.mavlink.MAV_STATE_EMERGENCY
+        if is_critical or is_emergency:
             return self.FLIGHT_MODE_FAILSAFE
 
         mode_name = mavutil.mode_string_v10(heartbeat)
 
-        if mode_name in self.PILOT_FLIGHT_MODES:
-            return self.FLIGHT_MODE_ARMED_PILOT
-
         if mode_name in self.AUTOMATIC_FLIGHT_MODES:
             return self.FLIGHT_MODE_ARMED_AUTOMATIC
 
-        # Warn once per unlisted mode; this is called several times a second
-        if mode_name not in self._warned_flight_modes:
-            self._warned_flight_modes.add(mode_name)
-            LOGGER.warning("Unclassified armed flight mode %s, reporting armed-pilot", mode_name)
+        # Pilot modes and unlisted modes are both reported as armed-pilot
+        if mode_name not in self.PILOT_FLIGHT_MODES:
+            # Warn once per unlisted mode; this is called several times a second
+            if mode_name not in self._warned_flight_modes:
+                self._warned_flight_modes.add(mode_name)
+                LOGGER.warning("Unclassified armed flight mode %s, reporting armed-pilot",
+                               mode_name)
         return self.FLIGHT_MODE_ARMED_PILOT
 
     # ----------------------
@@ -693,9 +698,6 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
             # ArduPilot stores CRSF LQ as LQ * 2.5 on a 0-255 scale, so 100 % arrives as ~98 %.
             # Undo that scaling to get the receiver's real LQ back.
             percent = percent * 255.0 / 250.0
-
-        if percent > 100.0:
-            percent = 100.0
 
         return round(percent, 1)
 
