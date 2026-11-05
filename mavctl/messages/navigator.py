@@ -1,14 +1,16 @@
 import time
-from math import atan, pi
+from math import atan, pi, cos
 from dataclasses import dataclass
 from typing import Optional, Iterable
 
 from pymavlink import mavutil
 
 from mavctl._internal import util
-from mavctl.messages.location import LocationGlobal, LocationLocal, Velocity
+from mavctl.messages.location import (LocationGlobal, LocationLocal,
+                                        Velocity, Battery, PositionAccuracy)
 from mavctl.connect.conn import Connect
 from mavctl._internal.logger import get_logger
+
 
 # Initialize the Logger
 LOGGER = get_logger(__name__)
@@ -84,6 +86,8 @@ class ADSBAvoidanceConfig:
 class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-attributes
     """Navigator class for MAVLink drones with logging and helper functions."""
 
+    uav_id: str = "null"   # UAV identifier sent in telemetry packets
+
     def __init__(self, ip: str = "udp:127.0.0.1:14551",
                  baud: int = 57600,
                  heartbeat_timeout: Optional[int] = None):
@@ -95,7 +99,9 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
             baud: Serial baud rate (ignored for UDP).
             heartbeat_timeout: Optional heartbeat timeout.
         """
-        self.master = Connect(ip=ip, baud=baud, heartbeat_timeout=heartbeat_timeout).master
+        # Keep the Connect object so its heartbeat manager stays reachable
+        self.connection = Connect(ip=ip, baud=baud, heartbeat_timeout=heartbeat_timeout)
+        self.master = self.connection.master
         LOGGER.info("Navigator connected to %s", ip)
 
     # ----------------------
@@ -183,6 +189,27 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
         LOGGER.info("MAVCTL: Armed!")
 
     # ----------------------
+    # UAV identifier
+    # ----------------------
+    def get_uav_id(self) -> str:
+        """Returns the UAV identifier sent in telemetry packets."""
+        LOGGER.debug("UAV identifier: %s", self.uav_id)
+        return self.uav_id
+
+    # ----------------------
+    # Timestamp
+    # ----------------------
+    def get_timestamp(self) -> float:
+        """Returns the current unix time in seconds, from the autopilot's GPS clock if available."""
+        msg = self.master.recv_match(type="SYSTEM_TIME", blocking=True)
+        if msg and msg.time_unix_usec > 0:
+            timestamp = msg.time_unix_usec / 1000000  # microseconds -> seconds
+        else:
+            timestamp = time.time()
+        LOGGER.debug("Timestamp: %.3f", timestamp)
+        return timestamp
+
+    # ----------------------
     # Position / Velocity access
     # ----------------------
     def get_global_position(self) -> LocationGlobal:
@@ -213,6 +240,65 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
         if msg:
             return Velocity(msg.vx, msg.vy, msg.vz)
         return Velocity(0, 0, 0)
+
+    # ----------------------
+    # Position accuracy
+    # ----------------------
+    def get_position_accuracy(self, timeout: float = 2.0) -> PositionAccuracy:
+        """
+        Returns the GPS horizontal and vertical position accuracy in metres.
+
+        Read from GPS_RAW_INT.h_acc / v_acc. These are MAVLink 2 extension
+        fields, so the link must be MAVLink 2. A value of None means the GPS
+        did not report that accuracy (or no GPS_RAW_INT arrived in time).
+        """
+        msg = self.master.recv_match(type="GPS_RAW_INT", blocking=True, timeout=timeout)
+        if msg is None:
+            LOGGER.warning("No GPS_RAW_INT received within %.1f s", timeout)
+            return PositionAccuracy(0, 0)
+
+        h_acc_mm = getattr(msg, "h_acc", 0)
+        v_acc_mm = getattr(msg, "v_acc", 0)
+
+        accuracy = PositionAccuracy(h_acc_mm, v_acc_mm)
+        LOGGER.debug("Position accuracy: %s", accuracy)
+        return accuracy
+
+    # ----------------------
+    # Latest received messages (non-blocking)
+    # ----------------------
+    def get_latest_message(self, message_type: str, max_age: float = 3.0):
+        """
+        Returns the newest received message of this type, or None if none has
+        arrived yet or it is older than max_age seconds.
+
+        pymavlink keeps the latest copy of every message in master.messages,
+        filled by whichever thread is reading (the HeartbeatManager reads
+        non-stop). So this never blocks and never steals messages.
+        """
+        msg = self.master.messages.get(message_type)
+        if msg is None:
+            return None
+
+        # _timestamp is pymavlink's receive time (time.time()) for the message
+        age = time.time() - msg._timestamp  # pylint: disable=protected-access
+        if age > max_age:
+            return None
+
+        return msg
+
+    # ----------------------
+    # Altitude AGL
+    # ----------------------
+    def get_altitude_agl(self) -> float:
+        """Returns the altitude above the home (takeoff) point in metres."""
+        msg = self.master.recv_match(type="GLOBAL_POSITION_INT", blocking=True)
+        if msg:
+            altitude = msg.relative_alt / 1000  # millimetres -> metres
+        else:
+            altitude = 0.0
+        LOGGER.debug("Altitude AGL: %.2f m", altitude)
+        return altitude
 
     # ----------------------
     # Takeoff
@@ -266,7 +352,10 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
         at their defaults.
         """
         setpoint = PositionSetpointLocal(x=x, y=y, z=z)
-        self.set_position_local_ned(setpoint, coordinate_frame=coordinate_frame, type_mask=type_mask)
+        self.set_position_local_ned(
+            setpoint,
+            coordinate_frame=coordinate_frame,
+            type_mask=type_mask)
 
     def set_position_global(self, setpoint: PositionSetpointGlobal,
                             coordinate_frame: int = mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
@@ -326,7 +415,6 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
     # ----------------------
     def simple_goto_local(self, x: float, y: float, z: float) -> None:
         """Move drone to local NED coordinates."""
-        type_mask = self.generate_typemask([0, 1, 2, 9])
         yaw_angle = atan(y / x) if x != 0 else 0
         setpoint = PositionSetpointLocal(x=x, y=y, z=-z, yaw=yaw_angle)
         self.set_position_local_ned(setpoint, type_mask=MASK_POS_YAW)
@@ -334,7 +422,6 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
 
     def simple_goto_global(self, lat: float, lon: float, alt: float) -> None:
         """Move drone to global coordinates."""
-        type_mask = self.generate_typemask([0, 1, 2, 9])
         start_point = self.get_global_position()
         yaw = util.Heading(start_point, LocationGlobal(lat, lon, alt))
         setpoint = PositionSetpointGlobal(lat=lat, lon=lon, alt=alt, yaw=yaw)
@@ -617,3 +704,119 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
             mask |= 1 << bit
 
         return mask
+
+    # ----------------------
+    # Flight modes
+    # ----------------------
+    FLIGHT_MODE_OFF = "off"
+    FLIGHT_MODE_IDLE = "idle"
+    FLIGHT_MODE_LINK_LOST = "link-lost"
+    FLIGHT_MODE_FAILSAFE = "failsafe"
+    FLIGHT_MODE_ARMED_PILOT = "armed-pilot"
+    FLIGHT_MODE_ARMED_AUTOMATIC = "armed-automatic"
+
+    PILOT_FLIGHT_MODES = {"STABILIZE", "LOITER", "ALT_HOLD", "ACRO"}
+    AUTOMATIC_FLIGHT_MODES = {"GUIDED", "RTL", "LAND", "AVOID_ADSB", "AUTO"}
+    _warned_flight_modes = set()
+
+    def get_flight_mode(self, heartbeat_timeout: float = 3.0) -> str:
+        """
+        Returns the competition flight mode string, one of:
+        'off', 'idle', 'failsafe', 'armed-pilot', 'armed-automatic'.
+
+        NO 'LINK-LOST' YET
+
+        Arguments:
+            heartbeat_timeout: Seconds without an autopilot
+            HEARTBEAT before the vehicle is reported as 'off'.
+        """
+        # Read the heartbeat the HeartbeatManager thread already received.
+        # Calling recv_match here would race that thread for heartbeats.
+        heartbeat_manager = self.connection.get_heartbeat_manager()
+        heartbeat, received_at = heartbeat_manager.get_last_autopilot_heartbeat()
+
+        # No autopilot heartbeat received yet
+        if heartbeat is None:
+            return self.FLIGHT_MODE_OFF
+
+        # Autopilot has been silent too long: treat it as off
+        silence = time.time() - received_at
+        if silence > heartbeat_timeout:
+            LOGGER.debug("Flight mode: off (no heartbeat for %.1f s)", silence)
+            return self.FLIGHT_MODE_OFF
+
+        armed_bit = heartbeat.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED
+        if armed_bit == 0:
+            return self.FLIGHT_MODE_IDLE
+
+        # CRITICAL or EMERGENCY system status both mean the autopilot is in failsafe
+        is_critical = heartbeat.system_status == mavutil.mavlink.MAV_STATE_CRITICAL
+        is_emergency = heartbeat.system_status == mavutil.mavlink.MAV_STATE_EMERGENCY
+        if is_critical or is_emergency:
+            return self.FLIGHT_MODE_FAILSAFE
+
+        mode_name = mavutil.mode_string_v10(heartbeat)
+
+        if mode_name in self.AUTOMATIC_FLIGHT_MODES:
+            return self.FLIGHT_MODE_ARMED_AUTOMATIC
+
+        # Pilot modes and unlisted modes are both reported as armed-pilot
+        if mode_name not in self.PILOT_FLIGHT_MODES:
+            # Warn once per unlisted mode; this is called several times a second
+            if mode_name not in self._warned_flight_modes:
+                self._warned_flight_modes.add(mode_name)
+                LOGGER.warning("Unclassified armed flight mode %s, reporting armed-pilot",
+                               mode_name)
+        return self.FLIGHT_MODE_ARMED_PILOT
+
+    # ----------------------
+    # RC link
+    # ----------------------
+    RC_RSSI_MAX = 254
+    RC_RSSI_UNKNOWN = 255
+
+    def get_rc_link_percent(self, crsf_lq: bool = False, max_age: float = 3.0) -> Optional[float]:
+        """
+        Returns the RC link quality as a percentage 0-100, or None if unknown.
+
+        Args:
+            crsf_lq: True when the drone runs ELRS with RSSI_TYPE = 3 and RC_OPTIONS bit 11
+            max_age: ignore messages older than this many seconds
+        """
+        # RC failsafe: the receiver stopped sending, and rssi would freeze at its last value
+        sys_status = self.get_latest_message("SYS_STATUS", max_age)
+        if sys_status is not None:
+            rc_bit = mavutil.mavlink.MAV_SYS_STATUS_SENSOR_RC_RECEIVER
+            rc_enabled = sys_status.onboard_control_sensors_enabled & rc_bit
+            rc_healthy = sys_status.onboard_control_sensors_health & rc_bit
+            if rc_enabled and not rc_healthy:
+                return 0.0
+
+        rc_channels = self.get_latest_message("RC_CHANNELS", max_age)
+        if rc_channels is None:
+            return None
+
+        if rc_channels.rssi == self.RC_RSSI_UNKNOWN:
+            return None
+
+        percent = rc_channels.rssi / self.RC_RSSI_MAX * 100.0
+
+        if crsf_lq:
+            # ArduPilot stores CRSF LQ as LQ * 2.5 on a 0-255 scale, so 100 % arrives as ~98 %.
+            # Undo that scaling to get the receiver's real LQ back.
+            percent = percent * 255.0 / 250.0
+
+        return round(percent, 1)
+
+    # ----------------------
+    # Battery
+    # ----------------------
+    def get_battery(self) -> Battery:
+        """Returns the current battery voltage, current and level."""
+        msg = self.master.recv_match(type="SYS_STATUS", blocking=True)
+        if msg:
+            battery = Battery(msg.voltage_battery, msg.current_battery, msg.battery_remaining)
+        else:
+            battery = Battery(0, -1, -1)
+        LOGGER.debug("Battery: %s", battery)
+        return battery
