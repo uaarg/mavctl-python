@@ -415,7 +415,6 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
     # ----------------------
     def simple_goto_local(self, x: float, y: float, z: float) -> None:
         """Move drone to local NED coordinates."""
-        type_mask = self.generate_typemask([0, 1, 2, 9])
         yaw_angle = atan(y / x) if x != 0 else 0
         setpoint = PositionSetpointLocal(x=x, y=y, z=-z, yaw=yaw_angle)
         self.set_position_local_ned(setpoint, type_mask=MASK_POS_YAW)
@@ -423,7 +422,6 @@ class Navigator:  # pylint: disable=too-many-public-methods,too-many-instance-at
 
     def simple_goto_global(self, lat: float, lon: float, alt: float) -> None:
         """Move drone to global coordinates."""
-        type_mask = self.generate_typemask([0, 1, 2, 9])
         start_point = self.get_global_position()
         yaw = util.Heading(start_point, LocationGlobal(lat, lon, alt))
         setpoint = PositionSetpointGlobal(lat=lat, lon=lon, alt=alt, yaw=yaw)
